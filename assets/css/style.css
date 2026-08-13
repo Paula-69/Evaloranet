@@ -1,0 +1,33 @@
+body{
+    background:#f4f6f9;
+}
+
+.card{
+    border-radius:15px;
+}
+
+.navbar-brand{
+    font-weight:bold;
+}
+
+.btn{
+    border-radius:10px;
+}
+
+.table{
+    background:white;
+}
+
+.semaforo-rojo{
+    background:#dc3545;
+    color:white;
+}
+
+.semaforo-amarillo{
+    background:#ffc107;
+}
+
+.semaforo-verde{
+    background:#198754;
+    color:white;
+}
