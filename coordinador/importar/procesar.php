@@ -1,479 +1,630 @@
 <?php
 
-require_once("../../config/seguridad/coordinador.php");
+session_start();
 
-require_once("../../vendor/autoload.php");
+/*
+|--------------------------------------------------------------------------
+| CONFIGURACIÓN
+|--------------------------------------------------------------------------
+*/
+
+require_once __DIR__ . '/../../config/config.php';
+require_once __DIR__ . '/../../config/seguridad/coordinador.php';
+require_once __DIR__ . '/../../vendor/autoload.php';
 
 use PhpOffice\PhpSpreadsheet\IOFactory;
 
-if($_SERVER["REQUEST_METHOD"] != "POST"){
 
-    header("Location: index.php");
+/*
+|--------------------------------------------------------------------------
+| FUNCIÓN PARA LIMPIAR DATOS
+|--------------------------------------------------------------------------
+*/
 
-    exit();
+function limpiarDato($dato)
+{
+    if ($dato === null) {
+        return '';
+    }
 
+    return trim((string)$dato);
 }
 
 
-if(!isset($_FILES["archivo"])){
+/*
+|--------------------------------------------------------------------------
+| FUNCIÓN PARA NORMALIZAR TEXTO
+|--------------------------------------------------------------------------
+*/
 
-    die("No se recibió ningún archivo.");
+function normalizarTexto($texto)
+{
+    $texto = trim((string)$texto);
 
+    return mb_strtolower($texto, 'UTF-8');
 }
 
 
-$tipo = $_POST["tipo"];
+/*
+|--------------------------------------------------------------------------
+| REDIRECCIÓN CON ERROR
+|--------------------------------------------------------------------------
+*/
 
-$archivo = $_FILES["archivo"];
+function errorImportacion($mensaje)
+{
+    header(
+        'Location: index.php?error=' .
+        urlencode($mensaje)
+    );
 
-
-if($archivo["error"] != 0){
-
-    die("Ocurrió un error al subir el archivo.");
-
+    exit;
 }
 
+
+/*
+|--------------------------------------------------------------------------
+| REDIRECCIÓN CON ÉXITO
+|--------------------------------------------------------------------------
+*/
+
+function exitoImportacion($mensaje)
+{
+    header(
+        'Location: index.php?success=' .
+        urlencode($mensaje)
+    );
+
+    exit;
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| VERIFICAR ARCHIVO
+|--------------------------------------------------------------------------
+*/
+
+if (!isset($_FILES['archivo_excel'])) {
+
+    errorImportacion(
+        'No se recibió ningún archivo Excel.'
+    );
+}
+
+
+$archivo = $_FILES['archivo_excel'];
+
+
+/*
+|--------------------------------------------------------------------------
+| VERIFICAR ERROR DE SUBIDA
+|--------------------------------------------------------------------------
+*/
+
+if ($archivo['error'] !== UPLOAD_ERR_OK) {
+
+    errorImportacion(
+        'Ocurrió un error al subir el archivo.'
+    );
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| VERIFICAR EXTENSIÓN
+|--------------------------------------------------------------------------
+*/
 
 $extension = strtolower(
-    pathinfo($archivo["name"], PATHINFO_EXTENSION)
+    pathinfo(
+        $archivo['name'],
+        PATHINFO_EXTENSION
+    )
 );
 
 
-$extensionesPermitidas = ["xlsx", "xls"];
+if (!in_array($extension, ['xlsx', 'xls'])) {
 
-
-if(!in_array($extension, $extensionesPermitidas)){
-
-    die("El archivo debe ser Excel (.xlsx o .xls).");
-
+    errorImportacion(
+        'El archivo debe ser Excel (.xlsx o .xls).'
+    );
 }
 
 
-try{
+/*
+|--------------------------------------------------------------------------
+| CARGAR EXCEL
+|--------------------------------------------------------------------------
+*/
+
+try {
 
     $documentoExcel = IOFactory::load(
-        $archivo["tmp_name"]
+        $archivo['tmp_name']
     );
 
-    $hoja = $documentoExcel->getActiveSheet();
+} catch (Exception $e) {
 
-    $filas = $hoja->toArray(
-        null,
-        true,
-        true,
-        true
+    errorImportacion(
+        'No fue posible leer el archivo Excel: ' .
+        $e->getMessage()
     );
-
-
-}catch(Exception $e){
-
-    die(
-        "No se pudo leer el archivo Excel: "
-        .$e->getMessage()
-    );
-
 }
 
 
 /*
-==================================================
-IMPORTAR ESTUDIANTES
-==================================================
+|--------------------------------------------------------------------------
+| OBTENER HOJAS
+|--------------------------------------------------------------------------
 */
 
-if($tipo == "estudiantes"){
-
-    $importados = 0;
-    $repetidos = 0;
-    $errores = 0;
+$hojas = $documentoExcel->getSheetNames();
 
 
-    foreach($filas as $numeroFila => $fila){
+/*
+|--------------------------------------------------------------------------
+| BUSCAR HOJA ESTUDIANTES
+|--------------------------------------------------------------------------
+*/
+
+$nombreHojaEstudiantes = null;
+
+foreach ($hojas as $nombreHoja) {
+
+    if (
+        normalizarTexto($nombreHoja) ===
+        normalizarTexto('Estudiantes')
+    ) {
+
+        $nombreHojaEstudiantes = $nombreHoja;
+
+        break;
+    }
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| BUSCAR HOJA DOCENTES
+|--------------------------------------------------------------------------
+*/
+
+$nombreHojaDocentes = null;
+
+foreach ($hojas as $nombreHoja) {
+
+    if (
+        normalizarTexto($nombreHoja) ===
+        normalizarTexto('Docentes')
+    ) {
+
+        $nombreHojaDocentes = $nombreHoja;
+
+        break;
+    }
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| VALIDAR HOJAS
+|--------------------------------------------------------------------------
+*/
+
+if ($nombreHojaEstudiantes === null) {
+
+    errorImportacion(
+        'El Excel no contiene una hoja llamada "Estudiantes".'
+    );
+}
+
+
+if ($nombreHojaDocentes === null) {
+
+    errorImportacion(
+        'El Excel no contiene una hoja llamada "Docentes".'
+    );
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| CONTADORES
+|--------------------------------------------------------------------------
+*/
+
+$estudiantesImportados = 0;
+$docentesImportados = 0;
+$cursosCreados = 0;
+
+$errores = [];
+
+
+/*
+|--------------------------------------------------------------------------
+| INICIAR TRANSACCIÓN
+|--------------------------------------------------------------------------
+|
+| IMPORTANTE:
+| Tu config.php utiliza mysqli.
+| Por eso aquí usamos $conexion y NO $pdo.
+|
+*/
+
+$conexion->begin_transaction();
+
+
+try {
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | PROCESAR ESTUDIANTES
+    |--------------------------------------------------------------------------
+    */
+
+    $hojaEstudiantes =
+        $documentoExcel->getSheetByName(
+            $nombreHojaEstudiantes
+        );
+
+
+    $filasEstudiantes =
+        $hojaEstudiantes
+            ->toArray(
+                null,
+                true,
+                true,
+                true
+            );
+
+
+    foreach ($filasEstudiantes as $numeroFila => $fila) {
+
 
         /*
-        Saltar la primera fila porque contiene
-        los nombres de las columnas.
+        |--------------------------------------------------------------------------
+        | SALTAR ENCABEZADO
+        |--------------------------------------------------------------------------
         */
 
-        if($numeroFila == 1){
-
+        if ($numeroFila == 1) {
             continue;
-
         }
 
 
-        $documento = trim($fila["A"]);
-        $nombres = trim($fila["B"]);
-        $apellidos = trim($fila["C"]);
-        $curso = trim($fila["D"]);
+        /*
+        |--------------------------------------------------------------------------
+        | LEER COLUMNAS
+        |--------------------------------------------------------------------------
+        |
+        | A = documento
+        | B = nombres
+        | C = apellidos
+        | D = correo
+        | E = telefono
+        | F = curso
+        |
+        */
+
+        $documento =
+            limpiarDato($fila['A'] ?? '');
+
+        $nombres =
+            limpiarDato($fila['B'] ?? '');
+
+        $apellidos =
+            limpiarDato($fila['C'] ?? '');
+
+        $correo =
+            limpiarDato($fila['D'] ?? '');
+
+        $telefono =
+            limpiarDato($fila['E'] ?? '');
+
+        $cursoNombre =
+            limpiarDato($fila['F'] ?? '');
 
 
         /*
-        Ignorar filas completamente vacías
+        |--------------------------------------------------------------------------
+        | IGNORAR FILA COMPLETAMENTE VACÍA
+        |--------------------------------------------------------------------------
         */
 
-        if(
-            $documento == "" &&
-            $nombres == "" &&
-            $apellidos == "" &&
-            $curso == ""
-        ){
+        if (
+            $documento === '' &&
+            $nombres === '' &&
+            $apellidos === '' &&
+            $correo === '' &&
+            $telefono === '' &&
+            $cursoNombre === ''
+        ) {
 
             continue;
-
         }
 
 
         /*
-        Validar información obligatoria
+        |--------------------------------------------------------------------------
+        | VALIDAR DATOS OBLIGATORIOS
+        |--------------------------------------------------------------------------
         */
 
-        if(
-            $documento == "" ||
-            $nombres == "" ||
-            $apellidos == "" ||
-            $curso == ""
-        ){
+        if ($documento === '') {
 
-            $errores++;
+            $errores[] =
+                "Estudiantes - fila $numeroFila: falta el documento.";
 
             continue;
+        }
 
+
+        if ($nombres === '') {
+
+            $errores[] =
+                "Estudiantes - fila $numeroFila: faltan los nombres.";
+
+            continue;
+        }
+
+
+        if ($apellidos === '') {
+
+            $errores[] =
+                "Estudiantes - fila $numeroFila: faltan los apellidos.";
+
+            continue;
+        }
+
+
+        if ($cursoNombre === '') {
+
+            $errores[] =
+                "Estudiantes - fila $numeroFila: falta el curso.";
+
+            continue;
         }
 
 
         /*
-        Verificar si el documento ya existe
+        |--------------------------------------------------------------------------
+        | BUSCAR / CREAR CURSO
+        |--------------------------------------------------------------------------
         */
 
-        $buscar = $conexion->prepare(
-            "SELECT id
-             FROM usuarios
-             WHERE documento=?"
-        );
+        $sqlCurso = "
+            SELECT id
+            FROM cursos
+            WHERE nombre = ?
+            LIMIT 1
+        ";
 
-        $buscar->bind_param(
-            "s",
-            $documento
-        );
+        $stmtCurso =
+            $conexion->prepare($sqlCurso);
 
-        $buscar->execute();
+        if (!$stmtCurso) {
 
-        $resultado = $buscar->get_result();
-
-
-        if($resultado->num_rows > 0){
-
-            $repetidos++;
-
-            continue;
-
+            throw new Exception(
+                'Error preparando consulta de cursos: ' .
+                $conexion->error
+            );
         }
 
 
-        /*
-        Verificar que el curso exista
-        */
-
-        $buscarCurso = $conexion->prepare(
-            "SELECT id
-             FROM cursos
-             WHERE nombre=?"
+        $stmtCurso->bind_param(
+            's',
+            $cursoNombre
         );
 
-        $buscarCurso->bind_param(
-            "s",
-            $curso
-        );
 
-        $buscarCurso->execute();
+        $stmtCurso->execute();
+
 
         $resultadoCurso =
-            $buscarCurso->get_result();
+            $stmtCurso->get_result();
 
 
-        if($resultadoCurso->num_rows == 0){
+        if ($resultadoCurso->num_rows > 0) {
 
-            $errores++;
+            $curso =
+                $resultadoCurso->fetch_assoc();
 
-            continue;
+            $cursoId =
+                (int)$curso['id'];
 
-        }
+        } else {
+
+            /*
+            |--------------------------------------------------------------------------
+            | CREAR CURSO
+            |--------------------------------------------------------------------------
+            */
+
+            $sqlCrearCurso = "
+                INSERT INTO cursos (nombre)
+                VALUES (?)
+            ";
+
+            $stmtCrearCurso =
+                $conexion->prepare(
+                    $sqlCrearCurso
+                );
+
+            if (!$stmtCrearCurso) {
+
+                throw new Exception(
+                    'Error preparando creación de curso: ' .
+                    $conexion->error
+                );
+            }
 
 
-        $cursoDatos =
-            $resultadoCurso->fetch_assoc();
-
-        $cursoId = $cursoDatos["id"];
-
-
-        /*
-        Crear contraseña inicial.
-        Será el documento.
-        */
-
-        $password =
-            password_hash(
-                $documento,
-                PASSWORD_DEFAULT
+            $stmtCrearCurso->bind_param(
+                's',
+                $cursoNombre
             );
 
 
-        /*
-        Insertar usuario
-        */
+            if (!$stmtCrearCurso->execute()) {
 
-        $insertarUsuario = $conexion->prepare(
-            "INSERT INTO usuarios
-            (
-                documento,
-                nombres,
-                apellidos,
-                password,
-                rol,
-                cambiar_password,
-                activo
-            )
-            VALUES
-            (?, ?, ?, ?, 'estudiante', 0, 1)"
-        );
+                throw new Exception(
+                    'No se pudo crear el curso "' .
+                    $cursoNombre .
+                    '": ' .
+                    $stmtCrearCurso->error
+                );
+            }
 
 
-        $insertarUsuario->bind_param(
-            "ssss",
-            $documento,
-            $nombres,
-            $apellidos,
-            $password
-        );
+            $cursoId =
+                $conexion->insert_id;
 
-
-        if(!$insertarUsuario->execute()){
-
-            $errores++;
-
-            continue;
-
+            $cursosCreados++;
         }
 
 
-        $usuarioId =
-            $conexion->insert_id;
-
-
         /*
-        Crear registro de estudiante
+        |--------------------------------------------------------------------------
+        | BUSCAR USUARIO POR DOCUMENTO
+        |--------------------------------------------------------------------------
         */
 
-        $insertarEstudiante =
-            $conexion->prepare(
-                "INSERT INTO estudiantes
-                (
-                    usuario_id,
-                    curso_id
-                )
-                VALUES
-                (?, ?)"
+        $sqlUsuario = "
+            SELECT id, rol
+            FROM usuarios
+            WHERE documento = ?
+            LIMIT 1
+        ";
+
+        $stmtUsuario =
+            $conexion->prepare($sqlUsuario);
+
+
+        if (!$stmtUsuario) {
+
+            throw new Exception(
+                'Error preparando búsqueda de usuario: ' .
+                $conexion->error
             );
-
-
-        $insertarEstudiante->bind_param(
-            "ii",
-            $usuarioId,
-            $cursoId
-        );
-
-
-        if($insertarEstudiante->execute()){
-
-            $importados++;
-
-        }else{
-
-            $errores++;
-
-        }
-
-    }
-
-
-    include("../../includes/header.php");
-
-    ?>
-
-    <div class="container mt-5">
-
-        <div class="card shadow">
-
-            <div class="card-header bg-primary text-white">
-
-                Resultado de importación
-
-            </div>
-
-            <div class="card-body">
-
-                <div class="alert alert-success">
-
-                    <strong>
-                        Estudiantes importados:
-                    </strong>
-
-                    <?php echo $importados; ?>
-
-                </div>
-
-
-                <div class="alert alert-warning">
-
-                    <strong>
-                        Registros repetidos:
-                    </strong>
-
-                    <?php echo $repetidos; ?>
-
-                </div>
-
-
-                <div class="alert alert-danger">
-
-                    <strong>
-                        Registros con errores:
-                    </strong>
-
-                    <?php echo $errores; ?>
-
-                </div>
-
-
-                <a
-                    href="index.php"
-                    class="btn btn-primary"
-                >
-
-                    Volver
-
-                </a>
-
-            </div>
-
-        </div>
-
-    </div>
-
-    <?php
-
-    include("../../includes/footer.php");
-
-    exit();
-
-}
-
-
-/*
-==================================================
-IMPORTAR DOCENTES
-==================================================
-*/
-
-if($tipo == "docentes"){
-
-    $importados = 0;
-    $repetidos = 0;
-    $errores = 0;
-
-
-    foreach($filas as $numeroFila => $fila){
-
-        if($numeroFila == 1){
-
-            continue;
-
         }
 
 
-        $documento = trim($fila["A"]);
-        $nombres = trim($fila["B"]);
-        $apellidos = trim($fila["C"]);
-        $correo = trim($fila["D"]);
-        $telefono = trim($fila["E"]);
-
-
-        if(
-            $documento == "" &&
-            $nombres == "" &&
-            $apellidos == ""
-        ){
-
-            continue;
-
-        }
-
-
-        if(
-            $documento == "" ||
-            $nombres == "" ||
-            $apellidos == ""
-        ){
-
-            $errores++;
-
-            continue;
-
-        }
-
-
-        /*
-        Verificar documento existente
-        */
-
-        $buscar = $conexion->prepare(
-            "SELECT id
-             FROM usuarios
-             WHERE documento=?"
-        );
-
-
-        $buscar->bind_param(
-            "s",
+        $stmtUsuario->bind_param(
+            's',
             $documento
         );
 
 
-        $buscar->execute();
+        $stmtUsuario->execute();
 
 
-        $resultado =
-            $buscar->get_result();
-
-
-        if($resultado->num_rows > 0){
-
-            $repetidos++;
-
-            continue;
-
-        }
+        $resultadoUsuario =
+            $stmtUsuario->get_result();
 
 
         /*
-        Crear contraseña inicial
+        |--------------------------------------------------------------------------
+        | USUARIO YA EXISTE
+        |--------------------------------------------------------------------------
         */
 
-        $password =
-            password_hash(
-                $documento,
-                PASSWORD_DEFAULT
+        if ($resultadoUsuario->num_rows > 0) {
+
+            $usuario =
+                $resultadoUsuario->fetch_assoc();
+
+            $usuarioId =
+                (int)$usuario['id'];
+
+            $rolActual =
+                $usuario['rol'];
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | SI YA ES DOCENTE, NO CONVERTIRLO
+            |--------------------------------------------------------------------------
+            */
+
+            if ($rolActual !== 'estudiante') {
+
+                $errores[] =
+                    "Estudiantes - fila $numeroFila: " .
+                    "el documento $documento ya pertenece a otro rol.";
+
+                continue;
+            }
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | ACTUALIZAR DATOS DEL USUARIO
+            |--------------------------------------------------------------------------
+            */
+
+            $sqlActualizar = "
+                UPDATE usuarios
+                SET
+                    nombres = ?,
+                    apellidos = ?,
+                    correo = ?,
+                    telefono = ?,
+                    activo = 1
+                WHERE id = ?
+            ";
+
+            $stmtActualizar =
+                $conexion->prepare(
+                    $sqlActualizar
+                );
+
+
+            if (!$stmtActualizar) {
+
+                throw new Exception(
+                    'Error preparando actualización de estudiante: ' .
+                    $conexion->error
+                );
+            }
+
+
+            $stmtActualizar->bind_param(
+                'ssssi',
+                $nombres,
+                $apellidos,
+                $correo,
+                $telefono,
+                $usuarioId
             );
 
 
-        /*
-        Insertar usuario docente
-        */
+            $stmtActualizar->execute();
 
-        $insertarUsuario =
-            $conexion->prepare(
-                "INSERT INTO usuarios
+
+        } else {
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | CREAR USUARIO ESTUDIANTE
+            |--------------------------------------------------------------------------
+            */
+
+            $passwordHash =
+                password_hash(
+                    $documento,
+                    PASSWORD_DEFAULT
+                );
+
+
+            $rol =
+                'estudiante';
+
+
+            $sqlInsertarUsuario = "
+                INSERT INTO usuarios
                 (
                     documento,
                     nombres,
@@ -486,288 +637,713 @@ if($tipo == "docentes"){
                     activo
                 )
                 VALUES
-                (?, ?, ?, ?, ?, ?, 'docente', 1, 1)"
+                (
+                    ?,
+                    ?,
+                    ?,
+                    ?,
+                    ?,
+                    ?,
+                    ?,
+                    0,
+                    1
+                )
+            ";
+
+
+            $stmtInsertarUsuario =
+                $conexion->prepare(
+                    $sqlInsertarUsuario
+                );
+
+
+            if (!$stmtInsertarUsuario) {
+
+                throw new Exception(
+                    'Error preparando inserción de estudiante: ' .
+                    $conexion->error
+                );
+            }
+
+
+            $stmtInsertarUsuario->bind_param(
+                'sssssss',
+                $documento,
+                $nombres,
+                $apellidos,
+                $correo,
+                $telefono,
+                $passwordHash,
+                $rol
             );
 
 
-        $insertarUsuario->bind_param(
-            "ssssss",
-            $documento,
-            $nombres,
-            $apellidos,
-            $correo,
-            $telefono,
-            $password
-        );
+            if (!$stmtInsertarUsuario->execute()) {
+
+                throw new Exception(
+                    'No se pudo crear el usuario estudiante ' .
+                    $documento .
+                    ': ' .
+                    $stmtInsertarUsuario->error
+                );
+            }
 
 
-        if(!$insertarUsuario->execute()){
-
-            $errores++;
-
-            continue;
-
+            $usuarioId =
+                $conexion->insert_id;
         }
 
 
-        $usuarioId =
-            $conexion->insert_id;
-
-
         /*
-        Crear registro docente
+        |--------------------------------------------------------------------------
+        | VERIFICAR SI YA EXISTE EN ESTUDIANTES
+        |--------------------------------------------------------------------------
         */
 
-        $insertarDocente =
+        $sqlEstudiante = "
+            SELECT id
+            FROM estudiantes
+            WHERE usuario_id = ?
+            LIMIT 1
+        ";
+
+
+        $stmtEstudiante =
             $conexion->prepare(
-                "INSERT INTO docentes
-                (
-                    usuario_id
-                )
-                VALUES
-                (?)"
+                $sqlEstudiante
             );
 
 
-        $insertarDocente->bind_param(
-            "i",
+        $stmtEstudiante->bind_param(
+            'i',
             $usuarioId
         );
 
 
-        if($insertarDocente->execute()){
+        $stmtEstudiante->execute();
 
-            $importados++;
 
-        }else{
+        $resultadoEstudiante =
+            $stmtEstudiante->get_result();
 
-            $errores++;
 
+        if ($resultadoEstudiante->num_rows > 0) {
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | ACTUALIZAR ESTUDIANTE
+            |--------------------------------------------------------------------------
+            */
+
+            $sqlActualizarEstudiante = "
+                UPDATE estudiantes
+                SET
+                    curso_id = ?,
+                    estado = 'Activo'
+                WHERE usuario_id = ?
+            ";
+
+
+            $stmtActualizarEstudiante =
+                $conexion->prepare(
+                    $sqlActualizarEstudiante
+                );
+
+
+            $stmtActualizarEstudiante->bind_param(
+                'ii',
+                $cursoId,
+                $usuarioId
+            );
+
+
+            $stmtActualizarEstudiante->execute();
+
+
+        } else {
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | INSERTAR ESTUDIANTE
+            |--------------------------------------------------------------------------
+            */
+
+            $estado =
+                'Activo';
+
+
+            $sqlInsertarEstudiante = "
+                INSERT INTO estudiantes
+                (
+                    usuario_id,
+                    curso_id,
+                    estado
+                )
+                VALUES
+                (
+                    ?,
+                    ?,
+                    ?
+                )
+            ";
+
+
+            $stmtInsertarEstudiante =
+                $conexion->prepare(
+                    $sqlInsertarEstudiante
+                );
+
+
+            if (!$stmtInsertarEstudiante) {
+
+                throw new Exception(
+                    'Error preparando estudiante: ' .
+                    $conexion->error
+                );
+            }
+
+
+            $stmtInsertarEstudiante->bind_param(
+                'iis',
+                $usuarioId,
+                $cursoId,
+                $estado
+            );
+
+
+            if (!$stmtInsertarEstudiante->execute()) {
+
+                throw new Exception(
+                    'No se pudo crear el registro de estudiante: ' .
+                    $stmtInsertarEstudiante->error
+                );
+            }
         }
 
+
+        $estudiantesImportados++;
     }
 
 
-    include("../../includes/header.php");
 
-    ?>
+    /*
+    |--------------------------------------------------------------------------
+    | PROCESAR DOCENTES
+    |--------------------------------------------------------------------------
+    |
+    | Para docentes usamos:
+    |
+    | A = documento
+    | B = nombres
+    | C = apellidos
+    | D = correo
+    | E = telefono
+    |
+    | La columna F puede existir, pero no se utiliza.
+    |
+    */
 
-    <div class="container mt-5">
-
-        <div class="card shadow">
-
-            <div class="card-header bg-success text-white">
-
-                Resultado de importación
-
-            </div>
-
-
-            <div class="card-body">
-
-                <div class="alert alert-success">
-
-                    <strong>
-                        Docentes importados:
-                    </strong>
-
-                    <?php echo $importados; ?>
-
-                </div>
+    $hojaDocentes =
+        $documentoExcel->getSheetByName(
+            $nombreHojaDocentes
+        );
 
 
-                <div class="alert alert-warning">
-
-                    <strong>
-                        Registros repetidos:
-                    </strong>
-
-                    <?php echo $repetidos; ?>
-
-                </div>
-
-
-                <div class="alert alert-danger">
-
-                    <strong>
-                        Registros con errores:
-                    </strong>
-
-                    <?php echo $errores; ?>
-
-                </div>
+    $filasDocentes =
+        $hojaDocentes
+            ->toArray(
+                null,
+                true,
+                true,
+                true
+            );
 
 
-                <a
-                    href="index.php"
-                    class="btn btn-primary"
-                >
+    foreach ($filasDocentes as $numeroFila => $fila) {
 
-                    Volver
 
-                </a>
+        /*
+        |--------------------------------------------------------------------------
+        | SALTAR ENCABEZADO
+        |--------------------------------------------------------------------------
+        */
 
-            </div>
+        if ($numeroFila == 1) {
+            continue;
+        }
 
-        </div>
 
-    </div>
+        $documento =
+            limpiarDato($fila['A'] ?? '');
 
-    <?php
+        $nombres =
+            limpiarDato($fila['B'] ?? '');
 
-    include("../../includes/footer.php");
+        $apellidos =
+            limpiarDato($fila['C'] ?? '');
 
-    exit();
+        $correo =
+            limpiarDato($fila['D'] ?? '');
 
+        $telefono =
+            limpiarDato($fila['E'] ?? '');
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | FILA VACÍA
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            $documento === '' &&
+            $nombres === '' &&
+            $apellidos === '' &&
+            $correo === '' &&
+            $telefono === ''
+        ) {
+
+            continue;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | VALIDACIONES
+        |--------------------------------------------------------------------------
+        */
+
+        if ($documento === '') {
+
+            $errores[] =
+                "Docentes - fila $numeroFila: falta el documento.";
+
+            continue;
+        }
+
+
+        if ($nombres === '') {
+
+            $errores[] =
+                "Docentes - fila $numeroFila: faltan los nombres.";
+
+            continue;
+        }
+
+
+        if ($apellidos === '') {
+
+            $errores[] =
+                "Docentes - fila $numeroFila: faltan los apellidos.";
+
+            continue;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | BUSCAR USUARIO
+        |--------------------------------------------------------------------------
+        */
+
+        $sqlUsuario = "
+            SELECT id, rol
+            FROM usuarios
+            WHERE documento = ?
+            LIMIT 1
+        ";
+
+
+        $stmtUsuario =
+            $conexion->prepare(
+                $sqlUsuario
+            );
+
+
+        if (!$stmtUsuario) {
+
+            throw new Exception(
+                'Error buscando docente: ' .
+                $conexion->error
+            );
+        }
+
+
+        $stmtUsuario->bind_param(
+            's',
+            $documento
+        );
+
+
+        $stmtUsuario->execute();
+
+
+        $resultadoUsuario =
+            $stmtUsuario->get_result();
+
+
+        if ($resultadoUsuario->num_rows > 0) {
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | USUARIO EXISTENTE
+            |--------------------------------------------------------------------------
+            */
+
+            $usuario =
+                $resultadoUsuario->fetch_assoc();
+
+            $usuarioId =
+                (int)$usuario['id'];
+
+            $rolActual =
+                $usuario['rol'];
+
+
+            if ($rolActual !== 'docente') {
+
+                $errores[] =
+                    "Docentes - fila $numeroFila: " .
+                    "el documento $documento ya pertenece a otro rol.";
+
+                continue;
+            }
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | ACTUALIZAR DOCENTE
+            |--------------------------------------------------------------------------
+            */
+
+            $sqlActualizar = "
+                UPDATE usuarios
+                SET
+                    nombres = ?,
+                    apellidos = ?,
+                    correo = ?,
+                    telefono = ?,
+                    activo = 1,
+                    cambiar_password = 1
+                WHERE id = ?
+            ";
+
+
+            $stmtActualizar =
+                $conexion->prepare(
+                    $sqlActualizar
+                );
+
+
+            if (!$stmtActualizar) {
+
+                throw new Exception(
+                    'Error actualizando docente: ' .
+                    $conexion->error
+                );
+            }
+
+
+            $stmtActualizar->bind_param(
+                'ssssi',
+                $nombres,
+                $apellidos,
+                $correo,
+                $telefono,
+                $usuarioId
+            );
+
+
+            $stmtActualizar->execute();
+
+
+        } else {
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | CREAR DOCENTE
+            |--------------------------------------------------------------------------
+            */
+
+            $passwordHash =
+                password_hash(
+                    $documento,
+                    PASSWORD_DEFAULT
+                );
+
+
+            $rol =
+                'docente';
+
+
+            $sqlInsertarUsuario = "
+                INSERT INTO usuarios
+                (
+                    documento,
+                    nombres,
+                    apellidos,
+                    correo,
+                    telefono,
+                    password,
+                    rol,
+                    cambiar_password,
+                    activo
+                )
+                VALUES
+                (
+                    ?,
+                    ?,
+                    ?,
+                    ?,
+                    ?,
+                    ?,
+                    ?,
+                    1,
+                    1
+                )
+            ";
+
+
+            $stmtInsertarUsuario =
+                $conexion->prepare(
+                    $sqlInsertarUsuario
+                );
+
+
+            if (!$stmtInsertarUsuario) {
+
+                throw new Exception(
+                    'Error preparando docente: ' .
+                    $conexion->error
+                );
+            }
+
+
+            $stmtInsertarUsuario->bind_param(
+                'sssssss',
+                $documento,
+                $nombres,
+                $apellidos,
+                $correo,
+                $telefono,
+                $passwordHash,
+                $rol
+            );
+
+
+            if (!$stmtInsertarUsuario->execute()) {
+
+                throw new Exception(
+                    'No se pudo crear el docente ' .
+                    $documento .
+                    ': ' .
+                    $stmtInsertarUsuario->error
+                );
+            }
+
+
+            $usuarioId =
+                $conexion->insert_id;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | VERIFICAR TABLA DOCENTES
+        |--------------------------------------------------------------------------
+        */
+
+        $sqlDocente = "
+            SELECT id
+            FROM docentes
+            WHERE usuario_id = ?
+            LIMIT 1
+        ";
+
+
+        $stmtDocente =
+            $conexion->prepare(
+                $sqlDocente
+            );
+
+
+        if (!$stmtDocente) {
+
+            throw new Exception(
+                'Error buscando registro docente: ' .
+                $conexion->error
+            );
+        }
+
+
+        $stmtDocente->bind_param(
+            'i',
+            $usuarioId
+        );
+
+
+        $stmtDocente->execute();
+
+
+        $resultadoDocente =
+            $stmtDocente->get_result();
+
+
+        if ($resultadoDocente->num_rows > 0) {
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | ACTUALIZAR DOCENTE
+            |--------------------------------------------------------------------------
+            */
+
+            $sqlActualizarDocente = "
+                UPDATE docentes
+                SET estado = 'Activo'
+                WHERE usuario_id = ?
+            ";
+
+
+            $stmtActualizarDocente =
+                $conexion->prepare(
+                    $sqlActualizarDocente
+                );
+
+
+            $stmtActualizarDocente->bind_param(
+                'i',
+                $usuarioId
+            );
+
+
+            $stmtActualizarDocente->execute();
+
+
+        } else {
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | INSERTAR DOCENTE
+            |--------------------------------------------------------------------------
+            */
+
+            $estado =
+                'Activo';
+
+
+            $sqlInsertarDocente = "
+                INSERT INTO docentes
+                (
+                    usuario_id,
+                    estado
+                )
+                VALUES
+                (
+                    ?,
+                    ?
+                )
+            ";
+
+
+            $stmtInsertarDocente =
+                $conexion->prepare(
+                    $sqlInsertarDocente
+                );
+
+
+            if (!$stmtInsertarDocente) {
+
+                throw new Exception(
+                    'Error preparando inserción docente: ' .
+                    $conexion->error
+                );
+            }
+
+
+            $stmtInsertarDocente->bind_param(
+                'is',
+                $usuarioId,
+                $estado
+            );
+
+
+            if (!$stmtInsertarDocente->execute()) {
+
+                throw new Exception(
+                    'No se pudo crear el registro docente: ' .
+                    $stmtInsertarDocente->error
+                );
+            }
+        }
+
+
+        $docentesImportados++;
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | CONFIRMAR TODO
+    |--------------------------------------------------------------------------
+    */
+
+    $conexion->commit();
+
+
+} catch (Exception $e) {
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | CANCELAR CAMBIOS SI OCURRIÓ UN ERROR
+    |--------------------------------------------------------------------------
+    */
+
+    $conexion->rollback();
+
+
+    errorImportacion(
+        'La importación fue cancelada. Error: ' .
+        $e->getMessage()
+    );
 }
 
 
-die("Tipo de importación no válido.");
+/*
+|--------------------------------------------------------------------------
+| MENSAJE FINAL
+|--------------------------------------------------------------------------
+*/
 
+$mensaje =
+    'Importación terminada. ' .
+    'Estudiantes procesados: ' .
+    $estudiantesImportados .
+    '. Docentes procesados: ' .
+    $docentesImportados .
+    '. Cursos creados: ' .
+    $cursosCreados;
 
 
 /*
 |--------------------------------------------------------------------------
-| SEGURIDAD
+| MOSTRAR ERRORES DE FILAS
 |--------------------------------------------------------------------------
 */
 
-require_once(__DIR__ . "/../../config/seguridad/coordinador.php");
+if (count($errores) > 0) {
 
-
-/*
-|--------------------------------------------------------------------------
-| VERIFICAR MÉTODO
-|--------------------------------------------------------------------------
-*/
-
-if ($_SERVER["REQUEST_METHOD"] !== "POST") {
-
-    header("Location: index.php");
-
-    exit();
-
+    $mensaje .=
+        ' Filas con problemas: ' .
+        count($errores) .
+        '.';
 }
 
 
-/*
-|--------------------------------------------------------------------------
-| VERIFICAR ARCHIVO
-|--------------------------------------------------------------------------
-*/
-
-if (!isset($_FILES["archivo"])) {
-
-    die("No se recibió ningún archivo.");
-
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| DATOS DEL FORMULARIO
-|--------------------------------------------------------------------------
-*/
-
-$tipo = $_POST["tipo"] ?? "";
-
-
-/*
-|--------------------------------------------------------------------------
-| VALIDAR TIPO
-|--------------------------------------------------------------------------
-*/
-
-if ($tipo !== "estudiantes" && $tipo !== "docentes") {
-
-    die("El tipo de información seleccionado no es válido.");
-
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| INFORMACIÓN DEL ARCHIVO
-|--------------------------------------------------------------------------
-*/
-
-$archivo = $_FILES["archivo"];
-
-
-/*
-|--------------------------------------------------------------------------
-| COMPROBAR ERROR DE CARGA
-|--------------------------------------------------------------------------
-*/
-
-if ($archivo["error"] !== UPLOAD_ERR_OK) {
-
-    die("Ocurrió un error al cargar el archivo.");
-
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| NOMBRE DEL ARCHIVO
-|--------------------------------------------------------------------------
-*/
-
-$nombreArchivo = $archivo["name"];
-
-
-/*
-|--------------------------------------------------------------------------
-| EXTENSIÓN
-|--------------------------------------------------------------------------
-*/
-
-$extension = strtolower(
-    pathinfo($nombreArchivo, PATHINFO_EXTENSION)
-);
-
-
-/*
-|--------------------------------------------------------------------------
-| VALIDAR EXTENSIÓN
-|--------------------------------------------------------------------------
-*/
-
-$extensionesPermitidas = [
-    "xlsx",
-    "xls"
-];
-
-
-if (!in_array($extension, $extensionesPermitidas)) {
-
-    die("El archivo debe ser Excel (.xlsx o .xls).");
-
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| MOSTRAR INFORMACIÓN
-|--------------------------------------------------------------------------
-*/
-
-echo "<h1>Archivo recibido correctamente</h1>";
-
-echo "<p><strong>Archivo:</strong> "
-    . htmlspecialchars($nombreArchivo)
-    . "</p>";
-
-echo "<p><strong>Tipo:</strong> "
-    . htmlspecialchars($tipo)
-    . "</p>";
-
-echo "<p><strong>Extensión:</strong> "
-    . htmlspecialchars($extension)
-    . "</p>";
-
-echo "<br>";
-
-echo '<a href="index.php">Volver a importar</a>';
-
-
+exitoImportacion($mensaje);
