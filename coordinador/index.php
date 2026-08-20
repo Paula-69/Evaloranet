@@ -17,8 +17,9 @@ include("../includes/navbar.php");
 
 <div class="container mt-4">
 
-<h2>Panel del Coordinador</h2>
-
+<h2>
+   Panel del coordinador
+</h2>
 <h4>
 
 Bienvenido
@@ -63,31 +64,11 @@ include("../includes/sidebar.php");
 
 <div class="col-md-10">
 
-<?php
 
-include("../includes/navbar.php");
-
-?>
 
 <div class="container mt-4">
 
-<h2>
 
-Panel del Coordinador
-
-</h2>
-
-<p>
-
-Bienvenido
-
-<strong>
-
-<?php echo $_SESSION["nombre"]; ?>
-
-</strong>
-
-</p>
 
 <?php
 

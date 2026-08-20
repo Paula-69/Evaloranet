@@ -1,28 +1,41 @@
-<nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+<nav class="navbar navbar-dark bg-primary">
 
-<div class="container">
+    <div class="container-fluid">
 
-<a class="navbar-brand" href="#">Seguimiento Académico</a>
+        <a
+            class="navbar-brand"
+            href="/Evaloranet/coordinador/index.php"
+        >
+            Seguimiento Académico
+        </a>
 
-<div class="ms-auto">
 
-<span class="text-white">
+        <div class="d-flex align-items-center">
 
-<?php
-echo $_SESSION['nombre'];
-?>
+            <span class="text-white me-3">
 
-</span>
+                <?php
 
-<a href="/seguimiento_academico/auth/logout.php"
-class="btn btn-danger btn-sm ms-3">
+                if (isset($_SESSION["nombres"])) {
 
-Cerrar sesión
+                    echo htmlspecialchars($_SESSION["nombres"]);
 
-</a>
+                }
 
-</div>
+                ?>
 
-</div>
+            </span>
+
+
+            <a
+                href="/Evaloranet/auth/logout.php"
+                class="btn btn-danger btn-sm"
+            >
+                Cerrar sesión
+            </a>
+
+        </div>
+
+    </div>
 
 </nav>
