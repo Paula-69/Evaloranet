@@ -1,58 +1,104 @@
 <?php
 
+session_start();
+
 require_once("../config/config.php");
 
-$documento = trim($_POST["documento"]);
-$password = trim($_POST["password"]);
+if ($_SERVER["REQUEST_METHOD"] !== "POST") {
+    header("Location: login.php");
+    exit();
+}
+
+$documento = trim($_POST["documento"] ?? '');
+$password = trim($_POST["password"] ?? '');
+
+if ($documento === '' || $password === '') {
+    header("Location: login.php?error=1");
+    exit();
+}
 
 $sql = "SELECT * FROM usuarios
-WHERE documento=?
-AND activo=1";
+        WHERE documento = ?
+        AND activo = 1
+        LIMIT 1";
 
 $stmt = $conexion->prepare($sql);
 
-$stmt->bind_param("s",$documento);
+if (!$stmt) {
+    die("Error en la consulta: " . $conexion->error);
+}
+
+$stmt->bind_param("s", $documento);
 
 $stmt->execute();
 
 $resultado = $stmt->get_result();
 
-if($resultado->num_rows==1){
+if ($resultado->num_rows !== 1) {
+    header("Location: login.php?error=1");
+    exit();
+}
 
-    $usuario = $resultado->fetch_assoc();
+$usuario = $resultado->fetch_assoc();
 
-    if(password_verify($password,$usuario["password"])){
+if (!password_verify($password, $usuario["password"])) {
+    header("Location: login.php?error=1");
+    exit();
+}
 
-        $_SESSION["id"] = $usuario["id"];
+/*
+|--------------------------------------------------------------------------
+| GUARDAR SESIÓN
+|--------------------------------------------------------------------------
+*/
 
-        $_SESSION["nombre"] = $usuario["nombres"];
+$_SESSION["id"] = $usuario["id"];
+$_SESSION["nombre"] = $usuario["nombres"];
+$_SESSION["rol"] = $usuario["rol"];
 
-        $_SESSION["rol"] = $usuario["rol"];
+/*
+|--------------------------------------------------------------------------
+| CAMBIO DE CONTRASEÑA
+|--------------------------------------------------------------------------
+*/
 
-        if(
+if (
+    ($usuario["rol"] === "coordinador" ||
+     $usuario["rol"] === "docente")
+    &&
+    (int)$usuario["cambiar_password"] === 1
+) {
 
-            ($usuario["rol"]=="coordinador" ||
+    header("Location: ../cambiar_password.php");
+    exit();
+}
 
-             $usuario["rol"]=="docente")
+/*
+|--------------------------------------------------------------------------
+| REDIRECCIÓN SEGÚN ROL
+|--------------------------------------------------------------------------
+*/
 
-             &&
+if ($usuario["rol"] === "coordinador") {
 
-             $usuario["cambiar_password"]==1
+    header("Location: ../coordinador/index.php");
+    exit();
 
-        ){
+}
 
-            header("Location: ../cambiar_password.php");
+if ($usuario["rol"] === "docente") {
 
-            exit();
+    header("Location: ../docente/index.php");
+    exit();
 
-        }
+}
 
-        header("Location: ../".$usuario["rol"]."/index.php");
+if ($usuario["rol"] === "estudiante") {
 
-        exit();
-
-    }
+    header("Location: ../estudiante/index.php");
+    exit();
 
 }
 
 header("Location: login.php?error=1");
+exit();
