@@ -15,7 +15,6 @@ include("../includes/navbar.php");
     <div class="row">
 
         <!-- SIDEBAR -->
-
         <div class="col-md-2 p-0">
 
             <?php
@@ -26,7 +25,6 @@ include("../includes/navbar.php");
 
 
         <!-- CONTENIDO PRINCIPAL -->
-
         <div class="col-md-10">
 
             <div class="container mt-4">
@@ -37,6 +35,7 @@ include("../includes/navbar.php");
                 <h2>
                     Panel del coordinador
                 </h2>
+
 
                 <h4>
 
@@ -102,13 +101,17 @@ include("../includes/navbar.php");
 
                 /*
                 |--------------------------------------------------------------------------
-                | REPORTES
+                | REPORTES / DESEMPEÑOS
                 |--------------------------------------------------------------------------
+                |
+                | Los registros que actualmente tenemos guardados
+                | se encuentran en desempeno_estudiantes.
+                |
                 */
 
                 $sql = $conexion->query(
                     "SELECT COUNT(*) AS total
-                     FROM reportes"
+                     FROM desempeno_estudiantes"
                 );
 
                 $reportes = $sql->fetch_assoc();
@@ -130,18 +133,20 @@ include("../includes/navbar.php");
                             <div class="card-body">
 
                                 <h5>
-                                    Estudiantes
+                                    👨‍🎓 Estudiantes
                                 </h5>
 
                                 <h2>
 
                                     <?php
-
                                     echo $estudiantes["total"];
-
                                     ?>
 
                                 </h2>
+
+                                <small>
+                                    Registrados
+                                </small>
 
                             </div>
 
@@ -159,18 +164,20 @@ include("../includes/navbar.php");
                             <div class="card-body">
 
                                 <h5>
-                                    Docentes
+                                    👨‍🏫 Docentes
                                 </h5>
 
                                 <h2>
 
                                     <?php
-
                                     echo $docentes["total"];
-
                                     ?>
 
                                 </h2>
+
+                                <small>
+                                    Registrados
+                                </small>
 
                             </div>
 
@@ -188,18 +195,20 @@ include("../includes/navbar.php");
                             <div class="card-body">
 
                                 <h5>
-                                    Cursos
+                                    🏫 Cursos
                                 </h5>
 
                                 <h2>
 
                                     <?php
-
                                     echo $cursos["total"];
-
                                     ?>
 
                                 </h2>
+
+                                <small>
+                                    Disponibles
+                                </small>
 
                             </div>
 
@@ -217,18 +226,20 @@ include("../includes/navbar.php");
                             <div class="card-body">
 
                                 <h5>
-                                    Reportes
+                                    📊 Reportes
                                 </h5>
 
                                 <h2>
 
                                     <?php
-
                                     echo $reportes["total"];
-
                                     ?>
 
                                 </h2>
+
+                                <small>
+                                    Generados
+                                </small>
 
                             </div>
 
@@ -244,12 +255,10 @@ include("../includes/navbar.php");
                 <hr>
 
 
-                <!-- ACCESOS RAPIDOS -->
+                <!-- ACCESOS RÁPIDOS -->
 
                 <h4>
-
                     Accesos rápidos
-
                 </h4>
 
 
@@ -265,7 +274,7 @@ include("../includes/navbar.php");
                             class="btn btn-primary w-100"
                         >
 
-                            Importar estudiantes y docentes
+                            📄 Importar estudiantes y docentes
 
                         </a>
 
@@ -281,14 +290,14 @@ include("../includes/navbar.php");
                             class="btn btn-success w-100"
                         >
 
-                            Administrar materias
+                            📚 Administrar materias
 
                         </a>
 
                     </div>
 
 
-                    <!-- CARGA ACADEMICA -->
+                    <!-- CARGA ACADÉMICA -->
 
                     <div class="col-md-4">
 
@@ -297,7 +306,7 @@ include("../includes/navbar.php");
                             class="btn btn-warning w-100"
                         >
 
-                            Asignar Carga académica
+                            👨‍🏫 Asignar carga académica
 
                         </a>
 

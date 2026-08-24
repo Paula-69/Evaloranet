@@ -68,8 +68,9 @@
             href="/Evaloranet/auth/logout.php"
             class="list-group-item list-group-item-action text-danger"
         >
-            Cerrar sesión
+            🚪 Cerrar sesión
         </a>
+
 
     </div>
 
