@@ -1,10 +1,12 @@
 /* =========================================================
    EVALORANET - ESTILOS GENERALES
-   ========================================================= */
+========================================================= */
 
 :root {
+
     --primary: #2563eb;
     --primary-dark: #1d4ed8;
+
     --success: #16a34a;
     --warning: #f59e0b;
     --danger: #dc2626;
@@ -14,21 +16,25 @@
 
     --bg: #f4f7fb;
     --card: #ffffff;
+
     --text: #1f2937;
     --muted: #6b7280;
 
     --border: #e5e7eb;
 
     --radius: 16px;
-    --shadow: 0 8px 25px rgba(0, 0, 0, 0.07);
+
+    --shadow:
+        0 8px 25px rgba(0, 0, 0, 0.07);
 }
 
 
 /* =========================================================
    GENERAL
-   ========================================================= */
+========================================================= */
 
 body {
+
     margin: 0;
     padding: 0;
 
@@ -47,16 +53,18 @@ body {
 
 /* =========================================================
    NAVBAR
-   ========================================================= */
+========================================================= */
 
 .navbar {
+
     min-height: 64px;
 
-    background: linear-gradient(
-        135deg,
-        #2563eb,
-        #1d4ed8
-    ) !important;
+    background:
+        linear-gradient(
+            135deg,
+            #2563eb,
+            #1d4ed8
+        ) !important;
 
     box-shadow:
         0 3px 12px rgba(0, 0, 0, 0.12);
@@ -67,6 +75,7 @@ body {
 
 
 .navbar-brand {
+
     font-size: 21px;
 
     font-weight: 700;
@@ -76,6 +85,7 @@ body {
 
 
 .navbar .nav-link {
+
     color: #ffffff !important;
 
     font-weight: 500;
@@ -83,6 +93,7 @@ body {
 
 
 .navbar .btn-danger {
+
     border: none;
 
     border-radius: 9px;
@@ -95,10 +106,11 @@ body {
 
 /* =========================================================
    SIDEBAR
-   ========================================================= */
+========================================================= */
 
 .sidebar,
 .bg-dark {
+
     background:
         linear-gradient(
             180deg,
@@ -108,16 +120,29 @@ body {
 }
 
 
+/*
+   CORRECCIÓN:
+   El sidebar ocupa toda la altura disponible.
+*/
+
 .sidebar {
+
     min-height: calc(100vh - 64px);
 
+    height: 100%;
+
     padding: 20px 14px;
+
+    box-sizing: border-box;
 }
 
 
-/* Título del sidebar */
+/* =========================================================
+   TÍTULO DEL SIDEBAR
+========================================================= */
 
 .sidebar h4 {
+
     color: #ffffff;
 
     font-size: 20px;
@@ -130,9 +155,12 @@ body {
 }
 
 
-/* Lista */
+/* =========================================================
+   LISTA DEL SIDEBAR
+========================================================= */
 
 .sidebar .list-group {
+
     border-radius: 12px;
 
     overflow: hidden;
@@ -142,9 +170,12 @@ body {
 }
 
 
-/* Elementos */
+/* =========================================================
+   ELEMENTOS DEL SIDEBAR
+========================================================= */
 
 .sidebar .list-group-item {
+
     border: none;
 
     border-bottom:
@@ -165,9 +196,12 @@ body {
 }
 
 
-/* Hover */
+/* =========================================================
+   HOVER SIDEBAR
+========================================================= */
 
 .sidebar .list-group-item:hover {
+
     background: #eff6ff;
 
     color: var(--primary);
@@ -176,9 +210,12 @@ body {
 }
 
 
-/* Elemento activo */
+/* =========================================================
+   ELEMENTO ACTIVO
+========================================================= */
 
 .sidebar .list-group-item.active {
+
     background:
         linear-gradient(
             135deg,
@@ -192,9 +229,12 @@ body {
 }
 
 
-/* Cerrar sesión */
+/* =========================================================
+   CERRAR SESIÓN
+========================================================= */
 
 .sidebar .list-group-item.text-danger {
+
     color: #dc2626 !important;
 
     font-weight: 600;
@@ -202,6 +242,7 @@ body {
 
 
 .sidebar .list-group-item.text-danger:hover {
+
     background: #fef2f2;
 
     color: #b91c1c !important;
@@ -210,26 +251,32 @@ body {
 
 /* =========================================================
    CONTENIDO
-   ========================================================= */
+========================================================= */
 
 .container-fluid {
+
     padding-left: 0;
+
     padding-right: 0;
 }
 
 
 .container {
+
     max-width: 1400px;
 }
 
 
-/* Títulos */
+/* =========================================================
+   TÍTULOS
+========================================================= */
 
 h1,
 h2,
 h3,
 h4,
 h5 {
+
     color: var(--text);
 
     font-weight: 700;
@@ -237,6 +284,7 @@ h5 {
 
 
 h2 {
+
     font-size: 30px;
 
     margin-bottom: 8px;
@@ -244,15 +292,17 @@ h2 {
 
 
 h4 {
+
     font-size: 18px;
 }
 
 
 /* =========================================================
    DASHBOARD
-   ========================================================= */
+========================================================= */
 
 .dashboard-title {
+
     font-size: 30px;
 
     font-weight: 750;
@@ -262,6 +312,7 @@ h4 {
 
 
 .dashboard-subtitle {
+
     color: var(--muted);
 
     font-size: 16px;
@@ -270,9 +321,10 @@ h4 {
 
 /* =========================================================
    TARJETAS
-   ========================================================= */
+========================================================= */
 
 .card {
+
     border: none;
 
     border-radius: var(--radius);
@@ -288,6 +340,7 @@ h4 {
 
 
 .card:hover {
+
     transform: translateY(-3px);
 
     box-shadow:
@@ -296,18 +349,23 @@ h4 {
 
 
 .card-body {
+
     padding: 24px;
 }
 
 
-/* Tarjetas de estadísticas */
+/* =========================================================
+   TARJETAS DE ESTADÍSTICAS
+========================================================= */
 
 .row > .col-md-3 .card {
+
     min-height: 145px;
 }
 
 
 .row > .col-md-3 .card h5 {
+
     color: rgba(255, 255, 255, 0.9);
 
     font-size: 15px;
@@ -317,6 +375,7 @@ h4 {
 
 
 .row > .col-md-3 .card h2 {
+
     color: #ffffff;
 
     font-size: 38px;
@@ -327,9 +386,12 @@ h4 {
 }
 
 
-/* Colores */
+/* =========================================================
+   COLORES
+========================================================= */
 
 .bg-primary {
+
     background:
         linear-gradient(
             135deg,
@@ -340,6 +402,7 @@ h4 {
 
 
 .bg-success {
+
     background:
         linear-gradient(
             135deg,
@@ -350,6 +413,7 @@ h4 {
 
 
 .bg-warning {
+
     background:
         linear-gradient(
             135deg,
@@ -360,6 +424,7 @@ h4 {
 
 
 .bg-danger {
+
     background:
         linear-gradient(
             135deg,
@@ -371,14 +436,16 @@ h4 {
 
 /* =========================================================
    ACCESOS RÁPIDOS
-   ========================================================= */
+========================================================= */
 
 .quick-access {
+
     margin-top: 25px;
 }
 
 
 .quick-card {
+
     background: #ffffff;
 
     border-radius: var(--radius);
@@ -398,6 +465,7 @@ h4 {
 
 
 .quick-card:hover {
+
     transform: translateY(-4px);
 
     box-shadow:
@@ -406,6 +474,7 @@ h4 {
 
 
 .quick-card h5 {
+
     margin-top: 10px;
 
     font-weight: 700;
@@ -413,6 +482,7 @@ h4 {
 
 
 .quick-card p {
+
     color: var(--muted);
 
     font-size: 14px;
@@ -423,9 +493,10 @@ h4 {
 
 /* =========================================================
    BOTONES
-   ========================================================= */
+========================================================= */
 
 .btn {
+
     border-radius: 9px;
 
     font-weight: 600;
@@ -438,11 +509,13 @@ h4 {
 
 
 .btn:hover {
+
     transform: translateY(-1px);
 }
 
 
 .btn-primary {
+
     background: var(--primary);
 
     border-color: var(--primary);
@@ -450,6 +523,7 @@ h4 {
 
 
 .btn-primary:hover {
+
     background: var(--primary-dark);
 
     border-color: var(--primary-dark);
@@ -457,6 +531,7 @@ h4 {
 
 
 .btn-success {
+
     background: var(--success);
 
     border-color: var(--success);
@@ -464,6 +539,7 @@ h4 {
 
 
 .btn-warning {
+
     color: #111827;
 
     background: var(--warning);
@@ -474,9 +550,10 @@ h4 {
 
 /* =========================================================
    TABLAS
-   ========================================================= */
+========================================================= */
 
 .table {
+
     background: #ffffff;
 
     border-radius: 12px;
@@ -488,19 +565,22 @@ h4 {
 
 
 .table thead th {
+
     background: #f3f4f6;
 
     color: #374151;
 
     font-weight: 700;
 
-    border-bottom: 2px solid var(--border);
+    border-bottom:
+        2px solid var(--border);
 
     padding: 14px;
 }
 
 
 .table tbody td {
+
     padding: 13px;
 
     vertical-align: middle;
@@ -508,35 +588,73 @@ h4 {
 
 
 .table tbody tr {
+
     transition:
         background 0.15s ease;
 }
 
 
 .table tbody tr:hover {
+
     background: #f8fafc;
 }
 
 
 /* =========================================================
+   ENCABEZADO CARGA ACADÉMICA
+========================================================= */
+
+.carga-header {
+
+    background: #eaf2ff !important;
+
+    color: #1d4ed8 !important;
+
+    border-bottom:
+        2px solid #2563eb;
+}
+
+
+.carga-header h5 {
+
+    color: #1d4ed8 !important;
+
+    font-weight: 700;
+}
+
+
+.carga-header #contadorCarga {
+
+    background: #ffffff !important;
+
+    color: #1d4ed8 !important;
+
+    border: 1px solid #bfdbfe;
+}
+
+
+/* =========================================================
    ALERTAS
-   ========================================================= */
+========================================================= */
 
 .alert {
+
     border: none;
 
     border-radius: 12px;
 
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+    box-shadow:
+        0 4px 15px rgba(0, 0, 0, 0.05);
 }
 
 
 /* =========================================================
    FORMULARIOS
-   ========================================================= */
+========================================================= */
 
 .form-control,
 .form-select {
+
     border-radius: 9px;
 
     border: 1px solid #d1d5db;
@@ -551,6 +669,7 @@ h4 {
 
 .form-control:focus,
 .form-select:focus {
+
     border-color: var(--primary);
 
     box-shadow:
@@ -559,6 +678,7 @@ h4 {
 
 
 .form-label {
+
     font-weight: 600;
 
     color: #374151;
@@ -567,12 +687,14 @@ h4 {
 
 /* =========================================================
    HR
-   ========================================================= */
+========================================================= */
 
 hr {
+
     border: none;
 
-    border-top: 1px solid var(--border);
+    border-top:
+        1px solid var(--border);
 
     opacity: 1;
 
@@ -582,16 +704,18 @@ hr {
 
 /* =========================================================
    FOOTER
-   ========================================================= */
+========================================================= */
 
 footer {
+
     margin-top: 40px;
 
     padding: 20px;
 
     background: #ffffff;
 
-    border-top: 1px solid var(--border);
+    border-top:
+        1px solid var(--border);
 
     color: var(--muted);
 
@@ -601,41 +725,66 @@ footer {
 
 /* =========================================================
    RESPONSIVE
-   ========================================================= */
+========================================================= */
 
 @media (max-width: 991px) {
 
     .sidebar {
+
         min-height: auto;
+
+        height: auto;
     }
 
     .row > .col-md-3 {
+
         margin-bottom: 15px;
     }
-
 }
 
 
 @media (max-width: 767px) {
 
     h2 {
+
         font-size: 25px;
     }
 
+
     .card-body {
+
         padding: 18px;
     }
 
+
     .row > .col-md-3 .card h2 {
+
         font-size: 32px;
     }
 
+
     .sidebar {
+
         padding: 10px;
     }
 
+
     .sidebar .list-group-item {
+
         padding: 12px;
     }
+}
+/* =========================================================
+   COLUMNA COMPLETA DEL SIDEBAR
+========================================================= */
 
+.sidebar-col {
+    background:
+        linear-gradient(
+            180deg,
+            #1f2937 0%,
+            #111827 100%
+        ) !important;
+
+    min-height: calc(100vh - 64px);
 }
