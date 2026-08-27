@@ -99,27 +99,157 @@ $stmt->close();
 
 
 // ======================================================
-// GUARDAR COLOR
+// OBTENER PERÍODOS
+// ======================================================
+
+$periodos = $conexion->query("
+    SELECT
+        id,
+        nombre
+    FROM periodos
+    ORDER BY id ASC
+");
+
+
+// ======================================================
+// DETERMINAR PERÍODO ACTUAL
+// ======================================================
+
+$periodo_id = isset($_GET["periodo_id"])
+    ? (int) $_GET["periodo_id"]
+    : 1;
+
+
+// ======================================================
+// VERIFICAR QUE EL PERÍODO EXISTA
+// ======================================================
+
+$verificar_periodo = $conexion->prepare("
+    SELECT
+        id,
+        nombre
+    FROM periodos
+    WHERE id = ?
+    LIMIT 1
+");
+
+$verificar_periodo->bind_param(
+    "i",
+    $periodo_id
+);
+
+$verificar_periodo->execute();
+
+$resultado_periodo = $verificar_periodo->get_result();
+
+
+// Si no existe, utilizar período 1
+
+if ($resultado_periodo->num_rows === 0) {
+
+    $periodo_id = 1;
+
+    $verificar_periodo->close();
+
+    $verificar_periodo = $conexion->prepare("
+        SELECT
+            id,
+            nombre
+        FROM periodos
+        WHERE id = ?
+        LIMIT 1
+    ");
+
+    $verificar_periodo->bind_param(
+        "i",
+        $periodo_id
+    );
+
+    $verificar_periodo->execute();
+
+    $resultado_periodo = $verificar_periodo->get_result();
+
+}
+
+$periodo_actual = $resultado_periodo->fetch_assoc();
+
+$verificar_periodo->close();
+
+
+// ======================================================
+// GUARDAR DESEMPEÑO
 // ======================================================
 
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
+
     $estudiante_id = isset($_POST["estudiante_id"])
         ? (int) $_POST["estudiante_id"]
         : 0;
+
 
     $color_id = isset($_POST["color_id"])
         ? (int) $_POST["color_id"]
         : 0;
 
 
-    if ($estudiante_id > 0 && $color_id > 0) {
+    $periodo_post = isset($_POST["periodo_id"])
+        ? (int) $_POST["periodo_id"]
+        : 0;
 
 
-        // Verificar que el estudiante pertenezca
-        // al curso de esta carga académica
+    // ================================================
+    // VERIFICAR PERÍODO
+    // ================================================
+
+    if ($periodo_post > 0) {
 
         $verificar = $conexion->prepare("
+            SELECT id
+            FROM periodos
+            WHERE id = ?
+            LIMIT 1
+        ");
+
+        $verificar->bind_param(
+            "i",
+            $periodo_post
+        );
+
+        $verificar->execute();
+
+        $resultado_verificar_periodo =
+            $verificar->get_result();
+
+        if (
+            $resultado_verificar_periodo->num_rows === 1
+        ) {
+
+            $periodo_id = $periodo_post;
+
+        }
+
+        $verificar->close();
+
+    }
+
+
+    // ================================================
+    // VALIDAR ESTUDIANTE Y COLOR
+    // ================================================
+
+    if (
+        $estudiante_id > 0 &&
+        $color_id > 0 &&
+        $periodo_id > 0
+    ) {
+
+
+        // ============================================
+        // VERIFICAR ESTUDIANTE
+        // ============================================
+
+        $verificar_estudiante = $conexion->prepare("
             SELECT id
             FROM estudiantes
             WHERE id = ?
@@ -128,53 +258,65 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             LIMIT 1
         ");
 
-        $verificar->bind_param(
+        $verificar_estudiante->bind_param(
             "ii",
             $estudiante_id,
             $carga["curso_id"]
         );
 
-        $verificar->execute();
+        $verificar_estudiante->execute();
 
-        $resultado_verificar = $verificar->get_result();
-
-
-        if ($resultado_verificar->num_rows === 1) {
+        $resultado_estudiante =
+            $verificar_estudiante->get_result();
 
 
-            // Verificar si ya existe desempeño
+        if ($resultado_estudiante->num_rows === 1) {
+
+
+            // ========================================
+            // BUSCAR DESEMPEÑO DEL PERÍODO
+            // ========================================
 
             $buscar = $conexion->prepare("
                 SELECT id
                 FROM desempeno_estudiantes
                 WHERE estudiante_id = ?
                 AND carga_academica_id = ?
+                AND periodo_id = ?
                 LIMIT 1
             ");
 
             $buscar->bind_param(
-                "ii",
+                "iii",
                 $estudiante_id,
-                $carga_id
+                $carga_id,
+                $periodo_id
             );
 
             $buscar->execute();
 
-            $resultado_buscar = $buscar->get_result();
+            $resultado_buscar =
+                $buscar->get_result();
 
+
+            // ========================================
+            // ACTUALIZAR
+            // ========================================
 
             if ($resultado_buscar->num_rows > 0) {
 
-                // ACTUALIZAR COLOR
 
-                $registro = $resultado_buscar->fetch_assoc();
+                $registro =
+                    $resultado_buscar->fetch_assoc();
 
-                $registro_id = (int) $registro["id"];
+                $registro_id =
+                    (int) $registro["id"];
 
 
                 $actualizar = $conexion->prepare("
                     UPDATE desempeno_estudiantes
-                    SET color_id = ?,
+                    SET
+                        color_id = ?,
                         fecha_registro = CURRENT_TIMESTAMP
                     WHERE id = ?
                 ");
@@ -192,22 +334,27 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
             } else {
 
-                // INSERTAR COLOR
+
+                // ====================================
+                // INSERTAR
+                // ====================================
 
                 $insertar = $conexion->prepare("
                     INSERT INTO desempeno_estudiantes
                     (
                         estudiante_id,
                         carga_academica_id,
+                        periodo_id,
                         color_id
                     )
-                    VALUES (?, ?, ?)
+                    VALUES (?, ?, ?, ?)
                 ");
 
                 $insertar->bind_param(
-                    "iii",
+                    "iiii",
                     $estudiante_id,
                     $carga_id,
+                    $periodo_id,
                     $color_id
                 );
 
@@ -217,18 +364,26 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
             }
 
+
             $buscar->close();
 
         }
 
-        $verificar->close();
+
+        $verificar_estudiante->close();
 
     }
 
 
+    // ================================================
+    // REGRESAR AL MISMO PERÍODO
+    // ================================================
+
     header(
         "Location: index.php?id=" .
         $carga_id .
+        "&periodo_id=" .
+        $periodo_id .
         "&guardado=1"
     );
 
@@ -280,6 +435,7 @@ $stmt = $conexion->prepare("
     LEFT JOIN desempeno_estudiantes de
         ON de.estudiante_id = e.id
         AND de.carga_academica_id = ?
+        AND de.periodo_id = ?
 
     LEFT JOIN colores_desempeno cd
         ON de.color_id = cd.id
@@ -293,8 +449,9 @@ $stmt = $conexion->prepare("
 ");
 
 $stmt->bind_param(
-    "ii",
+    "iii",
     $carga_id,
+    $periodo_id,
     $carga["curso_id"]
 );
 
@@ -317,7 +474,10 @@ include("../../includes/navbar.php");
 
     <div class="row">
 
-        <!-- SIDEBAR -->
+
+        <!-- ==================================================
+             SIDEBAR
+        =================================================== -->
 
         <div class="col-md-2 p-0">
 
@@ -330,14 +490,18 @@ include("../../includes/navbar.php");
         </div>
 
 
-        <!-- CONTENIDO -->
+        <!-- ==================================================
+             CONTENIDO
+        =================================================== -->
 
         <div class="col-md-10">
 
             <div class="container mt-4">
 
 
-                <!-- ENCABEZADO -->
+                <!-- ==================================================
+                     ENCABEZADO
+                =================================================== -->
 
                 <div class="d-flex justify-content-between align-items-center mb-4">
 
@@ -363,7 +527,7 @@ include("../../includes/navbar.php");
 
                         </p>
 
-                        <p class="text-muted">
+                        <p class="text-muted mb-0">
 
                             Materia:
 
@@ -392,20 +556,156 @@ include("../../includes/navbar.php");
                 </div>
 
 
-                <!-- MENSAJE -->
+                <!-- ==================================================
+                     SELECTOR DE PERÍODO
+                =================================================== -->
+
+                <div class="card shadow mb-4">
+
+                    <div class="card-header bg-primary text-white">
+
+                        <strong>
+
+                            📅 Período académico
+
+                        </strong>
+
+                    </div>
+
+
+                    <div class="card-body">
+
+                        <form
+                            method="GET"
+                            action="index.php"
+                            class="row align-items-end"
+                        >
+
+                            <input
+                                type="hidden"
+                                name="id"
+                                value="<?= $carga_id ?>"
+                            >
+
+
+                            <div class="col-md-6">
+
+                                <label
+                                    for="periodo_id"
+                                    class="form-label"
+                                >
+
+                                    Seleccione el período
+
+                                </label>
+
+
+                                <select
+                                    name="periodo_id"
+                                    id="periodo_id"
+                                    class="form-select"
+                                    required
+                                >
+
+                                    <?php
+
+                                    $periodos->data_seek(0);
+
+                                    while (
+                                        $periodo =
+                                        $periodos->fetch_assoc()
+                                    ):
+
+                                    ?>
+
+                                        <option
+                                            value="<?= (int) $periodo["id"] ?>"
+                                            <?= (
+                                                (int) $periodo["id"]
+                                                === $periodo_id
+                                            )
+                                                ? "selected"
+                                                : ""
+                                            ?>
+                                        >
+
+                                            <?= htmlspecialchars(
+                                                $periodo["nombre"]
+                                            ) ?>
+
+                                        </option>
+
+                                    <?php endwhile; ?>
+
+                                </select>
+
+                            </div>
+
+
+                            <div class="col-md-3 mt-3 mt-md-0">
+
+                                <button
+                                    type="submit"
+                                    class="btn btn-primary w-100"
+                                >
+
+                                    🔎 Ver período
+
+                                </button>
+
+                            </div>
+
+
+                        </form>
+
+
+                        <div class="alert alert-info mt-3 mb-0">
+
+                            Actualmente estás registrando el desempeño
+                            correspondiente a:
+
+                            <strong>
+
+                                <?= htmlspecialchars(
+                                    $periodo_actual["nombre"]
+                                ) ?>
+
+                            </strong>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                <!-- ==================================================
+                     MENSAJE DE GUARDADO
+                =================================================== -->
 
                 <?php if (isset($_GET["guardado"])): ?>
 
                     <div class="alert alert-success">
 
-                        El desempeño fue guardado correctamente.
+                        El desempeño fue guardado correctamente
+                        en
+
+                        <strong>
+
+                            <?= htmlspecialchars(
+                                $periodo_actual["nombre"]
+                            ) ?>
+
+                        </strong>.
 
                     </div>
 
                 <?php endif; ?>
 
 
-                <!-- LEYENDA -->
+                <!-- ==================================================
+                     LEYENDA
+                =================================================== -->
 
                 <div class="card shadow mb-4">
 
@@ -428,7 +728,10 @@ include("../../includes/navbar.php");
 
                             $colores->data_seek(0);
 
-                            while ($color = $colores->fetch_assoc()):
+                            while (
+                                $color =
+                                $colores->fetch_assoc()
+                            ):
 
                             ?>
 
@@ -467,7 +770,9 @@ include("../../includes/navbar.php");
                 </div>
 
 
-                <!-- TABLA -->
+                <!-- ==================================================
+                     TABLA
+                =================================================== -->
 
                 <div class="card shadow">
 
@@ -475,7 +780,11 @@ include("../../includes/navbar.php");
 
                         <strong>
 
-                            Estudiantes
+                            Estudiantes -
+
+                            <?= htmlspecialchars(
+                                $periodo_actual["nombre"]
+                            ) ?>
 
                         </strong>
 
@@ -484,7 +793,9 @@ include("../../includes/navbar.php");
 
                     <div class="card-body p-0">
 
-                        <?php if ($estudiantes->num_rows === 0): ?>
+                        <?php if (
+                            $estudiantes->num_rows === 0
+                        ): ?>
 
                             <div class="alert alert-warning m-3">
 
@@ -579,7 +890,9 @@ include("../../includes/navbar.php");
                                             </td>
 
 
-                                            <!-- COLOR ACTUAL -->
+                                            <!-- =================================
+                                                 DESEMPEÑO ACTUAL
+                                            ================================== -->
 
                                             <td>
 
@@ -628,7 +941,9 @@ include("../../includes/navbar.php");
                                             </td>
 
 
-                                            <!-- BOTONES -->
+                                            <!-- =================================
+                                                 BOTONES
+                                            ================================== -->
 
                                             <td>
 
@@ -637,12 +952,20 @@ include("../../includes/navbar.php");
                                                     class="d-flex gap-2"
                                                 >
 
+
                                                     <input
                                                         type="hidden"
                                                         name="estudiante_id"
                                                         value="<?= (int) $estudiante[
                                                             "estudiante_id"
                                                         ] ?>"
+                                                    >
+
+
+                                                    <input
+                                                        type="hidden"
+                                                        name="periodo_id"
+                                                        value="<?= $periodo_id ?>"
                                                     >
 
 
@@ -726,6 +1049,8 @@ include("../../includes/navbar.php");
 
 
 <?php
+
+$stmt->close();
 
 include("../../includes/footer.php");
 

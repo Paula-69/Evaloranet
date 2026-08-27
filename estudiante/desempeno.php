@@ -1,42 +1,65 @@
 <?php
 
+session_start();
+
 require_once("../config/config.php");
 require_once("../config/seguridad/estudiante.php");
 
-include("../includes/header.php");
-include("../includes/navbar.php");
-
 
 // =====================================================
-// BUSCAR EL ESTUDIANTE RELACIONADO CON EL USUARIO
+// BUSCAR ESTUDIANTE RELACIONADO CON EL USUARIO
 // =====================================================
 
-$usuario_id = $_SESSION["id"];
+$usuario_id = $_SESSION["id"] ?? 0;
+
+
+if ($usuario_id <= 0) {
+
+    header("Location: index.php");
+    exit();
+
+}
+
 
 $sql = "
-    SELECT 
+    SELECT
+
         e.id AS estudiante_id,
+
         e.curso_id,
+
         c.nombre AS curso
+
     FROM estudiantes e
-    INNER JOIN cursos c 
+
+    INNER JOIN cursos c
         ON e.curso_id = c.id
+
     WHERE e.usuario_id = ?
+
     LIMIT 1
 ";
 
+
 $stmt = $conexion->prepare($sql);
-$stmt->bind_param("i", $usuario_id);
+
+$stmt->bind_param(
+    "i",
+    $usuario_id
+);
+
 $stmt->execute();
 
 $resultado = $stmt->get_result();
 
 
 // =====================================================
-// VERIFICAR QUE EXISTA EL ESTUDIANTE
+// VERIFICAR ESTUDIANTE
 // =====================================================
 
 if ($resultado->num_rows === 0) {
+
+    $stmt->close();
 
     ?>
 
@@ -54,24 +77,118 @@ if ($resultado->num_rows === 0) {
     <?php
 
     include("../includes/footer.php");
+
     exit();
+
 }
 
 
 $estudiante = $resultado->fetch_assoc();
 
-$estudiante_id = $estudiante["estudiante_id"];
-$curso_id      = $estudiante["curso_id"];
-$curso         = $estudiante["curso"];
+$estudiante_id =
+    (int) $estudiante["estudiante_id"];
+
+$curso_id =
+    (int) $estudiante["curso_id"];
+
+$curso =
+    $estudiante["curso"];
 
 $stmt->close();
 
 
 // =====================================================
-// BUSCAR DESEMPEÑO DEL ESTUDIANTE
+// OBTENER PERÍODO SELECCIONADO
+// =====================================================
+
+// Por defecto mostramos el Período 1
+
+$periodo_id = isset($_GET["periodo_id"])
+    ? (int) $_GET["periodo_id"]
+    : 1;
+
+
+// =====================================================
+// VERIFICAR PERÍODO
+// =====================================================
+
+$stmtPeriodo = $conexion->prepare("
+    SELECT
+        id,
+        nombre
+    FROM periodos
+    WHERE id = ?
+    LIMIT 1
+");
+
+$stmtPeriodo->bind_param(
+    "i",
+    $periodo_id
+);
+
+$stmtPeriodo->execute();
+
+$resultadoPeriodo =
+    $stmtPeriodo->get_result();
+
+
+if ($resultadoPeriodo->num_rows === 0) {
+
+    $periodo_id = 1;
+
+    $stmtPeriodo->close();
+
+
+    $stmtPeriodo = $conexion->prepare("
+        SELECT
+            id,
+            nombre
+        FROM periodos
+        WHERE id = ?
+        LIMIT 1
+    ");
+
+    $stmtPeriodo->bind_param(
+        "i",
+        $periodo_id
+    );
+
+    $stmtPeriodo->execute();
+
+    $resultadoPeriodo =
+        $stmtPeriodo->get_result();
+
+}
+
+
+$periodo_actual =
+    $resultadoPeriodo->fetch_assoc();
+
+$periodo_nombre =
+    $periodo_actual["nombre"] ?? "Periodo 1";
+
+$stmtPeriodo->close();
+
+
+// =====================================================
+// OBTENER TODOS LOS PERÍODOS
+// =====================================================
+
+$periodos = $conexion->query("
+    SELECT
+        id,
+        nombre
+    FROM periodos
+    ORDER BY id ASC
+");
+
+
+// =====================================================
+// BUSCAR DESEMPEÑO
 // =====================================================
 
 $sql = "
+
     SELECT
 
         m.nombre AS materia,
@@ -95,122 +212,220 @@ $sql = "
 
     WHERE ds.estudiante_id = ?
 
-    ORDER BY m.nombre
+    AND ds.periodo_id = ?
+
+    ORDER BY
+        m.nombre ASC
+
 ";
 
+
 $stmt = $conexion->prepare($sql);
-$stmt->bind_param("i", $estudiante_id);
+
+$stmt->bind_param(
+    "ii",
+    $estudiante_id,
+    $periodo_id
+);
+
 $stmt->execute();
 
-$resultado = $stmt->get_result();
+$resultado =
+    $stmt->get_result();
+
+
+// =====================================================
+// HEADER
+// =====================================================
+
+include("../includes/header.php");
+
+include("../includes/navbar.php");
 
 ?>
+
 
 <div class="container-fluid">
 
     <div class="row">
 
-        <!-- MENÚ LATERAL -->
+
+        <!-- =====================================================
+             MENÚ LATERAL
+        ====================================================== -->
 
         <div class="col-md-2 p-0">
 
-            <?php include("../includes/sidebar.php"); ?>
+            <?php
+
+            include("../includes/sidebar.php");
+
+            ?>
 
         </div>
 
 
-        <!-- CONTENIDO -->
+        <!-- =====================================================
+             CONTENIDO
+        ====================================================== -->
 
         <div class="col-md-10">
 
             <div class="container mt-4">
 
 
-                <!-- ENCABEZADO -->
+                <!-- =================================================
+                     ENCABEZADO
+                ================================================== -->
 
                 <div class="mb-4">
 
                     <h2>
+
                         Mi desempeño académico
+
                     </h2>
+
 
                     <h5 class="text-muted">
 
                         Estudiante:
-                        <?= htmlspecialchars($_SESSION["nombre"]) ?>
+
+                        <?= htmlspecialchars(
+                            $_SESSION["nombre"] ?? "Estudiante"
+                        ) ?>
 
                     </h5>
+
 
                     <h6 class="text-muted">
 
                         Curso:
-                        <?= htmlspecialchars($curso) ?>
+
+                        <?= htmlspecialchars(
+                            $curso
+                        ) ?>
 
                     </h6>
 
                 </div>
 
 
-                <!-- LEYENDA -->
+                <!-- =================================================
+                     SELECTOR DE PERÍODO
+                ================================================== -->
 
                 <div class="card shadow mb-4">
 
                     <div class="card-header bg-primary text-white">
 
                         <h5 class="mb-0">
-                            Semáforo de desempeño
+
+                            📅 Consultar período académico
+
                         </h5>
 
                     </div>
 
+
                     <div class="card-body">
 
-                        <div class="d-flex gap-4 flex-wrap">
+                        <form
+                            method="GET"
+                            action="desempeno.php"
+                            class="row align-items-end"
+                        >
 
-                            <div>
 
-                                <span
-                                    class="badge"
-                                    style="
-                                        background-color:#dc3545;
-                                        font-size:15px;
-                                    "
+                            <div class="col-md-7">
+
+                                <label
+                                    for="periodo_id"
+                                    class="form-label"
                                 >
-                                    Bajo
-                                </span>
+
+                                    Selecciona el período
+                                    que deseas consultar
+
+                                </label>
+
+
+                                <select
+                                    name="periodo_id"
+                                    id="periodo_id"
+                                    class="form-select"
+                                    required
+                                >
+
+                                    <?php
+
+                                    if ($periodos):
+
+                                        while (
+                                            $periodo =
+                                            $periodos->fetch_assoc()
+                                        ):
+
+                                    ?>
+
+                                        <option
+                                            value="<?= (int) $periodo["id"] ?>"
+                                            <?= (
+                                                (int) $periodo["id"]
+                                                === $periodo_id
+                                            )
+                                                ? "selected"
+                                                : ""
+                                            ?>
+                                        >
+
+                                            <?= htmlspecialchars(
+                                                $periodo["nombre"]
+                                            ) ?>
+
+                                        </option>
+
+                                    <?php
+
+                                        endwhile;
+
+                                    endif;
+
+                                    ?>
+
+                                </select>
 
                             </div>
 
 
-                            <div>
+                            <div class="col-md-3 mt-3 mt-md-0">
 
-                                <span
-                                    class="badge"
-                                    style="
-                                        background-color:#ffc107;
-                                        color:#000;
-                                        font-size:15px;
-                                    "
+                                <button
+                                    type="submit"
+                                    class="btn btn-primary w-100"
                                 >
-                                    Básico
-                                </span>
+
+                                    🔎 Ver período
+
+                                </button>
 
                             </div>
 
 
-                            <div>
+                        </form>
 
-                                <span
-                                    class="badge"
-                                    style="
-                                        background-color:#198754;
-                                        font-size:15px;
-                                    "
-                                >
-                                    Alto
-                                </span>
 
-                            </div>
+                        <div class="alert alert-info mt-3 mb-0">
+
+                            Actualmente estás viendo:
+
+                            <strong>
+
+                                <?= htmlspecialchars(
+                                    $periodo_nombre
+                                ) ?>
+
+                            </strong>
 
                         </div>
 
@@ -219,7 +434,77 @@ $resultado = $stmt->get_result();
                 </div>
 
 
-                <!-- TABLA DE DESEMPEÑO -->
+                <!-- =================================================
+                     LEYENDA
+                ================================================== -->
+
+                <div class="card shadow mb-4">
+
+                    <div class="card-header bg-primary text-white">
+
+                        <h5 class="mb-0">
+
+                            Semáforo de desempeño
+
+                        </h5>
+
+                    </div>
+
+
+                    <div class="card-body">
+
+                        <div class="d-flex flex-wrap gap-3">
+
+
+                            <span
+                                class="badge p-3"
+                                style="
+                                    background-color:#dc3545;
+                                    font-size:14px;
+                                "
+                            >
+
+                                🔴 Bajo
+
+                            </span>
+
+
+                            <span
+                                class="badge p-3 text-dark"
+                                style="
+                                    background-color:#ffc107;
+                                    font-size:14px;
+                                "
+                            >
+
+                                🟡 Básico
+
+                            </span>
+
+
+                            <span
+                                class="badge p-3"
+                                style="
+                                    background-color:#198754;
+                                    font-size:14px;
+                                "
+                            >
+
+                                🟢 Alto
+
+                            </span>
+
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                <!-- =================================================
+                     TABLA DE DESEMPEÑO
+                ================================================== -->
 
                 <div class="card shadow">
 
@@ -227,7 +512,11 @@ $resultado = $stmt->get_result();
 
                         <h5 class="mb-0">
 
-                            Desempeño por materia
+                            Desempeño por materia -
+
+                            <?= htmlspecialchars(
+                                $periodo_nombre
+                            ) ?>
 
                         </h5>
 
@@ -236,42 +525,46 @@ $resultado = $stmt->get_result();
 
                     <div class="card-body">
 
-                        <div class="table-responsive">
-
-                            <table
-                                class="table table-bordered table-striped align-middle"
-                            >
-
-                                <thead>
-
-                                    <tr>
-
-                                        <th>
-                                            #
-                                        </th>
-
-                                        <th>
-                                            Materia
-                                        </th>
-
-                                        <th class="text-center">
-                                            Desempeño
-                                        </th>
-
-                                        <th class="text-center">
-                                            Último registro
-                                        </th>
-
-                                    </tr>
-
-                                </thead>
+                        <?php if (
+                            $resultado->num_rows > 0
+                        ): ?>
 
 
-                                <tbody>
+                            <div class="table-responsive">
 
-                                <?php
+                                <table
+                                    class="table table-bordered table-striped align-middle"
+                                >
 
-                                if ($resultado->num_rows > 0) {
+                                    <thead>
+
+                                        <tr>
+
+                                            <th>
+                                                #
+                                            </th>
+
+                                            <th>
+                                                Materia
+                                            </th>
+
+                                            <th class="text-center">
+                                                Desempeño
+                                            </th>
+
+                                            <th class="text-center">
+                                                Último registro
+                                            </th>
+
+                                        </tr>
+
+                                    </thead>
+
+
+                                    <tbody>
+
+
+                                    <?php
 
                                     $contador = 1;
 
@@ -279,105 +572,141 @@ $resultado = $stmt->get_result();
                                     while (
                                         $fila =
                                         $resultado->fetch_assoc()
-                                    ) {
+                                    ):
 
-                                        $color = $fila["color"];
-
-                                ?>
-
-                                    <tr>
-
-                                        <td>
-
-                                            <?= $contador++ ?>
-
-                                        </td>
+                                    ?>
 
 
-                                        <td>
-
-                                            <?= htmlspecialchars(
-                                                $fila["materia"]
-                                            ) ?>
-
-                                        </td>
+                                        <tr>
 
 
-                                        <td class="text-center">
+                                            <!-- NÚMERO -->
 
-                                            <span
-                                                class="badge"
-                                                style="
-                                                    background-color:
-                                                    <?= htmlspecialchars($color) ?>;
-                                                    font-size:15px;
-                                                    padding:8px 15px;
-                                                "
-                                            >
+                                            <td>
 
-                                                <?= htmlspecialchars(
-                                                    ucfirst(
-                                                        $fila["desempeno"]
+                                                <?= $contador++ ?>
+
+                                            </td>
+
+
+                                            <!-- MATERIA -->
+
+                                            <td>
+
+                                                <strong>
+
+                                                    <?= htmlspecialchars(
+                                                        $fila["materia"]
+                                                    ) ?>
+
+                                                </strong>
+
+                                            </td>
+
+
+                                            <!-- DESEMPEÑO -->
+
+                                            <td class="text-center">
+
+
+                                                <span
+                                                    class="badge p-2"
+                                                    style="
+                                                        background-color:
+                                                        <?= htmlspecialchars(
+                                                            $fila["color"]
+                                                        ) ?>;
+                                                    "
+                                                >
+
+                                                    <?= htmlspecialchars(
+                                                        ucfirst(
+                                                            $fila[
+                                                                "desempeno"
+                                                            ]
+                                                        )
+                                                    ) ?>
+
+                                                </span>
+
+
+                                            </td>
+
+
+                                            <!-- FECHA -->
+
+                                            <td class="text-center">
+
+                                                <?php
+
+                                                if (
+                                                    !empty(
+                                                        $fila[
+                                                            "fecha_registro"
+                                                        ]
                                                     )
-                                                ) ?>
+                                                ) {
 
-                                            </span>
+                                                    echo htmlspecialchars(
+                                                        date(
+                                                            "d/m/Y H:i",
+                                                            strtotime(
+                                                                $fila[
+                                                                    "fecha_registro"
+                                                                ]
+                                                            )
+                                                        )
+                                                    );
 
-                                        </td>
+                                                } else {
+
+                                                    echo "Sin fecha";
+
+                                                }
+
+                                                ?>
+
+                                            </td>
 
 
-                                        <td class="text-center">
+                                        </tr>
 
-                                            <?= htmlspecialchars(
-                                                $fila["fecha_registro"]
-                                            ) ?>
 
-                                        </td>
+                                    <?php endwhile; ?>
 
-                                    </tr>
 
-                                <?php
+                                    </tbody>
 
-                                    }
+                                </table>
 
-                                } else {
+                            </div>
 
-                                ?>
 
-                                    <tr>
+                        <?php else: ?>
 
-                                        <td
-                                            colspan="4"
-                                            class="text-center"
-                                        >
 
-                                            <div class="alert alert-info mb-0">
+                            <div class="alert alert-info mb-0">
 
-                                                Todavía no hay registros
-                                                de desempeño para este
-                                                estudiante.
+                                No tienes registros de desempeño
+                                para
 
-                                            </div>
+                                <strong>
 
-                                        </td>
+                                    <?= htmlspecialchars(
+                                        $periodo_nombre
+                                    ) ?>
 
-                                    </tr>
+                                </strong>.
 
-                                <?php
+                            </div>
 
-                                }
 
-                                ?>
-
-                                </tbody>
-
-                            </table>
-
-                        </div>
+                        <?php endif; ?>
 
                     </div>
 
                 </div>
+
 
             </div>
 

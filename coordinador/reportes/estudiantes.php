@@ -61,7 +61,10 @@ $sql = "
 
 $stmt = $conexion->prepare($sql);
 
-$stmt->bind_param("i", $carga_id);
+$stmt->bind_param(
+    "i",
+    $carga_id
+);
 
 $stmt->execute();
 
@@ -81,6 +84,92 @@ if ($resultado->num_rows === 0) {
 $carga = $resultado->fetch_assoc();
 
 $stmt->close();
+
+
+// =====================================================
+// OBTENER PERÍODO SELECCIONADO
+// =====================================================
+
+// Por defecto: Período 1
+
+$periodo_id = isset($_GET["periodo_id"])
+    ? (int) $_GET["periodo_id"]
+    : 1;
+
+
+// =====================================================
+// VERIFICAR PERÍODO
+// =====================================================
+
+$stmtPeriodo = $conexion->prepare("
+    SELECT
+        id,
+        nombre
+    FROM periodos
+    WHERE id = ?
+    LIMIT 1
+");
+
+$stmtPeriodo->bind_param(
+    "i",
+    $periodo_id
+);
+
+$stmtPeriodo->execute();
+
+$resultadoPeriodo =
+    $stmtPeriodo->get_result();
+
+
+if ($resultadoPeriodo->num_rows === 0) {
+
+    $periodo_id = 1;
+
+    $stmtPeriodo->close();
+
+
+    $stmtPeriodo = $conexion->prepare("
+        SELECT
+            id,
+            nombre
+        FROM periodos
+        WHERE id = ?
+        LIMIT 1
+    ");
+
+    $stmtPeriodo->bind_param(
+        "i",
+        $periodo_id
+    );
+
+    $stmtPeriodo->execute();
+
+    $resultadoPeriodo =
+        $stmtPeriodo->get_result();
+
+}
+
+
+$periodo_actual =
+    $resultadoPeriodo->fetch_assoc();
+
+$periodo_nombre =
+    $periodo_actual["nombre"] ?? "Periodo 1";
+
+$stmtPeriodo->close();
+
+
+// =====================================================
+// OBTENER TODOS LOS PERÍODOS
+// =====================================================
+
+$periodos = $conexion->query("
+    SELECT
+        id,
+        nombre
+    FROM periodos
+    ORDER BY id ASC
+");
 
 
 // =====================================================
@@ -116,7 +205,10 @@ $sql = "
 
     LEFT JOIN desempeno_estudiantes de
         ON de.estudiante_id = e.id
+
         AND de.carga_academica_id = ?
+
+        AND de.periodo_id = ?
 
     LEFT JOIN colores_desempeno cd
         ON de.color_id = cd.id
@@ -131,8 +223,9 @@ $sql = "
 $stmt = $conexion->prepare($sql);
 
 $stmt->bind_param(
-    "ii",
+    "iii",
     $carga_id,
+    $periodo_id,
     $carga["curso_id"]
 );
 
@@ -146,16 +239,20 @@ $estudiantes = $stmt->get_result();
 // =====================================================
 
 include("../../includes/header.php");
+
 include("../../includes/navbar.php");
 
 ?>
+
 
 <div class="container-fluid">
 
     <div class="row">
 
 
-        <!-- SIDEBAR -->
+        <!-- =====================================================
+             SIDEBAR
+        ====================================================== -->
 
         <div class="col-md-2 p-0">
 
@@ -168,14 +265,18 @@ include("../../includes/navbar.php");
         </div>
 
 
-        <!-- CONTENIDO -->
+        <!-- =====================================================
+             CONTENIDO
+        ====================================================== -->
 
         <div class="col-md-10">
 
             <div class="container mt-4">
 
 
-                <!-- VOLVER -->
+                <!-- =================================================
+                     VOLVER
+                ================================================== -->
 
                 <div class="mb-3">
 
@@ -191,7 +292,9 @@ include("../../includes/navbar.php");
                 </div>
 
 
-                <!-- INFORMACIÓN -->
+                <!-- =================================================
+                     INFORMACIÓN
+                ================================================== -->
 
                 <div class="card shadow mb-4">
 
@@ -249,7 +352,141 @@ include("../../includes/navbar.php");
                 </div>
 
 
-                <!-- TABLA DE ESTUDIANTES -->
+                <!-- =================================================
+                     SELECTOR DE PERÍODO
+                ================================================== -->
+
+                <div class="card shadow mb-4">
+
+                    <div class="card-header bg-primary text-white">
+
+                        <h5 class="mb-0">
+
+                            📅 Consultar período académico
+
+                        </h5>
+
+                    </div>
+
+
+                    <div class="card-body">
+
+                        <form
+                            method="GET"
+                            action="estudiantes.php"
+                            class="row align-items-end"
+                        >
+
+
+                            <!-- CONSERVAR CARGA -->
+
+                            <input
+                                type="hidden"
+                                name="id"
+                                value="<?= $carga_id ?>"
+                            >
+
+
+                            <div class="col-md-7">
+
+                                <label
+                                    for="periodo_id"
+                                    class="form-label"
+                                >
+
+                                    Selecciona el período
+                                    que deseas consultar
+
+                                </label>
+
+
+                                <select
+                                    name="periodo_id"
+                                    id="periodo_id"
+                                    class="form-select"
+                                    required
+                                >
+
+                                    <?php
+
+                                    if ($periodos):
+
+                                        while (
+                                            $periodo =
+                                            $periodos->fetch_assoc()
+                                        ):
+
+                                    ?>
+
+                                        <option
+                                            value="<?= (int) $periodo["id"] ?>"
+                                            <?= (
+                                                (int) $periodo["id"]
+                                                === $periodo_id
+                                            )
+                                                ? "selected"
+                                                : ""
+                                            ?>
+                                        >
+
+                                            <?= htmlspecialchars(
+                                                $periodo["nombre"]
+                                            ) ?>
+
+                                        </option>
+
+                                    <?php
+
+                                        endwhile;
+
+                                    endif;
+
+                                    ?>
+
+                                </select>
+
+                            </div>
+
+
+                            <div class="col-md-3 mt-3 mt-md-0">
+
+                                <button
+                                    type="submit"
+                                    class="btn btn-primary w-100"
+                                >
+
+                                    🔎 Ver período
+
+                                </button>
+
+                            </div>
+
+
+                        </form>
+
+
+                        <div class="alert alert-info mt-3 mb-0">
+
+                            Actualmente estás viendo:
+
+                            <strong>
+
+                                <?= htmlspecialchars(
+                                    $periodo_nombre
+                                ) ?>
+
+                            </strong>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                <!-- =================================================
+                     TABLA DE ESTUDIANTES
+                ================================================== -->
 
                 <div class="card shadow">
 
@@ -257,7 +494,11 @@ include("../../includes/navbar.php");
 
                         <h5 class="mb-0">
 
-                            Seguimiento de estudiantes
+                            Seguimiento de estudiantes -
+
+                            <?= htmlspecialchars(
+                                $periodo_nombre
+                            ) ?>
 
                         </h5>
 

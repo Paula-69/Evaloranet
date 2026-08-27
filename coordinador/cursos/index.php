@@ -6,177 +6,177 @@ require_once("../../config/config.php");
 require_once("../../config/seguridad/coordinador.php");
 
 
-// ==========================================
-// VARIABLES
-// ==========================================
+// =====================================================
+// PROCESAR CREACIÓN DEL CURSO
+// =====================================================
 
 $mensaje = "";
-$tipoMensaje = "";
+$tipo_mensaje = "";
+
+$nombre = "";
 
 
-// ==========================================
-// CREAR CURSO
-// ==========================================
-
-if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["crear_curso"])) {
+if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
     $nombre = trim($_POST["nombre"] ?? "");
 
 
+    // =================================================
+    // VALIDAR CAMPO VACÍO
+    // =================================================
+
     if ($nombre === "") {
 
-        $mensaje = "Debe escribir el nombre del curso.";
-        $tipoMensaje = "danger";
+        $mensaje = "Debes ingresar el nombre del curso.";
+        $tipo_mensaje = "danger";
 
-    } else {
+    }
 
-        // Verificar si ya existe
-        $sqlVerificar = "
+
+    // =================================================
+    // VALIDAR FORMATO DEL CURSO
+    // =================================================
+
+    elseif (!preg_match('/^[0-9]{3,4}$/', $nombre)) {
+
+        $mensaje =
+            "El curso debe tener 3 o 4 números. " .
+            "Ejemplos: 601, 602, 701, 1001, 1101.";
+
+        $tipo_mensaje = "danger";
+
+    }
+
+
+    else {
+
+        // =================================================
+        // COMPROBAR SI YA EXISTE
+        // =================================================
+
+        $sql = "
             SELECT id
             FROM cursos
             WHERE nombre = ?
+            LIMIT 1
         ";
 
-        $stmt = $conexion->prepare($sqlVerificar);
+        $stmt = $conexion->prepare($sql);
 
-        if ($stmt) {
 
-            $stmt->bind_param("s", $nombre);
+        if (!$stmt) {
+
+            $mensaje =
+                "No se pudo realizar la consulta.";
+
+            $tipo_mensaje = "danger";
+
+        } else {
+
+            $stmt->bind_param(
+                "s",
+                $nombre
+            );
+
             $stmt->execute();
 
             $resultado = $stmt->get_result();
 
 
+            // =================================================
+            // CURSO YA EXISTENTE
+            // =================================================
+
             if ($resultado->num_rows > 0) {
 
-                $mensaje = "Ese curso ya existe.";
-                $tipoMensaje = "warning";
+                $mensaje =
+                    "El curso " .
+                    htmlspecialchars($nombre) .
+                    " ya existe.";
 
-            } else {
+                $tipo_mensaje = "warning";
 
-                $sqlInsertar = "
+            }
+
+
+            // =================================================
+            // CREAR CURSO
+            // =================================================
+
+            else {
+
+                $stmt->close();
+
+
+                $sqlInsert = "
                     INSERT INTO cursos (nombre)
                     VALUES (?)
                 ";
 
-                $stmtInsertar = $conexion->prepare($sqlInsertar);
+                $stmtInsert =
+                    $conexion->prepare($sqlInsert);
 
 
-                if ($stmtInsertar) {
+                if (!$stmtInsert) {
 
-                    $stmtInsertar->bind_param("s", $nombre);
+                    $mensaje =
+                        "No se pudo preparar el registro del curso.";
 
-
-                    if ($stmtInsertar->execute()) {
-
-                        $mensaje = "Curso creado correctamente.";
-                        $tipoMensaje = "success";
-
-                    } else {
-
-                        $mensaje = "Error al crear el curso: "
-                                 . $stmtInsertar->error;
-
-                        $tipoMensaje = "danger";
-                    }
-
-
-                    $stmtInsertar->close();
+                    $tipo_mensaje = "danger";
 
                 } else {
 
-                    $mensaje = "Error preparando la consulta.";
-                    $tipoMensaje = "danger";
-                }
-            }
+                    $stmtInsert->bind_param(
+                        "s",
+                        $nombre
+                    );
 
 
-            $stmt->close();
+                    if ($stmtInsert->execute()) {
 
-        } else {
+                        $mensaje =
+                            "El curso " .
+                            htmlspecialchars($nombre) .
+                            " fue creado correctamente.";
 
-            $mensaje = "Error preparando la consulta.";
-            $tipoMensaje = "danger";
-        }
-    }
-}
+                        $tipo_mensaje = "success";
 
-
-// ==========================================
-// ELIMINAR CURSO
-// ==========================================
-
-if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["eliminar_curso"])) {
-
-    $curso_id = (int) ($_POST["curso_id"] ?? 0);
-
-
-    if ($curso_id > 0) {
-
-        // Primero verificamos si tiene carga académica
-        $sqlVerificar = "
-            SELECT id
-            FROM carga_academica
-            WHERE curso_id = ?
-            LIMIT 1
-        ";
-
-        $stmt = $conexion->prepare($sqlVerificar);
-
-        if ($stmt) {
-
-            $stmt->bind_param("i", $curso_id);
-            $stmt->execute();
-
-            $resultado = $stmt->get_result();
-
-
-            if ($resultado->num_rows > 0) {
-
-                $mensaje = "No se puede eliminar el curso porque tiene una carga académica asignada.";
-                $tipoMensaje = "warning";
-
-            } else {
-
-                $sqlEliminar = "
-                    DELETE FROM cursos
-                    WHERE id = ?
-                ";
-
-                $stmtEliminar = $conexion->prepare($sqlEliminar);
-
-
-                if ($stmtEliminar) {
-
-                    $stmtEliminar->bind_param("i", $curso_id);
-
-
-                    if ($stmtEliminar->execute()) {
-
-                        $mensaje = "Curso eliminado correctamente.";
-                        $tipoMensaje = "success";
+                        // Limpiar campo
+                        $nombre = "";
 
                     } else {
 
-                        $mensaje = "No se pudo eliminar el curso.";
-                        $tipoMensaje = "danger";
+                        $mensaje =
+                            "No se pudo guardar el curso.";
+
+                        $tipo_mensaje = "danger";
+
                     }
 
 
-                    $stmtEliminar->close();
+                    $stmtInsert->close();
+
                 }
+
             }
 
 
-            $stmt->close();
+            if (isset($stmt)) {
+
+                $stmt->close();
+
+            }
+
         }
+
     }
+
 }
 
 
-// ==========================================
+// =====================================================
 // OBTENER CURSOS
-// ==========================================
+// =====================================================
 
 $sqlCursos = "
     SELECT
@@ -186,39 +186,19 @@ $sqlCursos = "
     ORDER BY nombre ASC
 ";
 
-$resultadoCursos = $conexion->query($sqlCursos);
+$resultadoCursos =
+    $conexion->query($sqlCursos);
+
+
+// =====================================================
+// HEADER
+// =====================================================
+
+include("../../includes/header.php");
+
+include("../../includes/navbar.php");
 
 ?>
-
-
-<!DOCTYPE html>
-
-<html lang="es">
-
-<head>
-
-    <meta charset="UTF-8">
-
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
-
-    <title>Administrar cursos</title>
-
-
-    <link
-        href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
-        rel="stylesheet"
-    >
-
-</head>
-
-
-<body>
-
-
-<?php include("../../includes/navbar.php"); ?>
 
 
 <div class="container-fluid">
@@ -226,101 +206,215 @@ $resultadoCursos = $conexion->query($sqlCursos);
     <div class="row">
 
 
-        <!-- SIDEBAR -->
+        <!-- =====================================================
+             SIDEBAR DEL COORDINADOR
+        ====================================================== -->
 
         <div class="col-md-2 p-0">
 
-            <?php include("../../includes/sidebar.php"); ?>
+            <?php
+
+            include("../../includes/sidebar.php");
+
+            ?>
 
         </div>
 
 
-        <!-- CONTENIDO -->
+        <!-- =====================================================
+             CONTENIDO PRINCIPAL
+        ====================================================== -->
 
         <div class="col-md-10">
 
-            <div class="container mt-4">
+
+            <div class="container mt-4 mb-5">
 
 
-                <h2>
-                    Administración de cursos
-                </h2>
+                <!-- =================================================
+                     ENCABEZADO
+                ================================================== -->
 
-                <p class="text-muted">
-                    Crea y administra los cursos del sistema.
-                </p>
+                <div class="d-flex justify-content-between
+                            align-items-center mb-4">
 
-                <hr>
+                    <div>
+
+                        <h2 class="mb-1">
+
+                            Crear cursos
+
+                        </h2>
 
 
-                <!-- MENSAJE -->
+                        <p class="text-muted mb-0">
+
+                            Administra los cursos de la institución.
+
+                        </p>
+
+                    </div>
+
+
+                    <a
+                        href="../index.php"
+                        class="btn btn-dark"
+                    >
+
+                        ← Volver al dashboard
+
+                    </a>
+
+                </div>
+
+
+                <!-- =================================================
+                     MENSAJES
+                ================================================== -->
 
                 <?php if ($mensaje !== ""): ?>
 
-                    <div class="alert alert-<?= htmlspecialchars($tipoMensaje) ?>">
+                    <div
+                        class="alert alert-<?= $tipo_mensaje ?>
+                        alert-dismissible fade show"
+                        role="alert"
+                    >
 
-                        <?= htmlspecialchars($mensaje) ?>
+                        <?= $mensaje ?>
+
+
+                        <button
+                            type="button"
+                            class="btn-close"
+                            data-bs-dismiss="alert"
+                            aria-label="Cerrar"
+                        ></button>
 
                     </div>
 
                 <?php endif; ?>
 
 
-                <!-- CREAR CURSO -->
+                <!-- =================================================
+                     FORMULARIO
+                ================================================== -->
 
                 <div class="card shadow mb-4">
 
-                    <div class="card-header bg-primary text-white">
 
-                        <h5 class="mb-0">
-                            Crear nuevo curso
-                        </h5>
+                    <div
+                        class="card-header bg-primary text-white"
+                    >
+
+                        <h4 class="mb-0">
+
+                            Nuevo curso
+
+                        </h4>
 
                     </div>
 
 
                     <div class="card-body">
 
-                        <form method="POST">
 
-                            <div class="row align-items-end">
+                        <form
+                            action="index.php"
+                            method="POST"
+                        >
 
 
-                                <div class="col-md-8">
+                            <!-- =====================================
+                                 NOMBRE DEL CURSO
+                            ====================================== -->
 
-                                    <label class="form-label">
+                            <div class="mb-3">
 
-                                        Nombre del curso
+                                <label
+                                    for="nombre"
+                                    class="form-label"
+                                >
 
-                                    </label>
+                                    Nombre del curso
 
-                                    <input
-                                        type="text"
-                                        name="nombre"
-                                        class="form-control"
-                                        placeholder="Ejemplo: 10-A"
-                                        required
-                                    >
+                                </label>
+
+
+                                <input
+                                    type="text"
+                                    name="nombre"
+                                    id="nombre"
+                                    class="form-control"
+                                    placeholder="Ejemplo: 601"
+                                    pattern="[0-9]{3,4}"
+                                    minlength="3"
+                                    maxlength="4"
+                                    inputmode="numeric"
+                                    autocomplete="off"
+                                    value="<?= htmlspecialchars(
+                                        $nombre
+                                    ) ?>"
+                                    required
+                                >
+
+
+                                <div class="form-text">
+
+                                    Ingresa el curso utilizando
+                                    el formato de tu colegio.
+
+                                    <strong>
+
+                                        Ejemplos:
+                                        601, 602, 603, 701,
+                                        702, 801, 901, 1001, 1101
+
+                                    </strong>
 
                                 </div>
 
+                            </div>
 
-                                <div class="col-md-4">
 
-                                    <button
-                                        type="submit"
-                                        name="crear_curso"
-                                        class="btn btn-primary w-100"
-                                    >
+                            <!-- =====================================
+                                 BOTONES
+                            ====================================== -->
 
-                                        Crear curso
+                            <div class="mt-4">
 
-                                    </button>
 
-                                </div>
+                                <button
+                                    type="submit"
+                                    class="btn btn-success"
+                                >
+
+                                    Guardar curso
+
+                                </button>
+
+
+                                <a
+                                    href="index.php"
+                                    class="btn btn-secondary"
+                                >
+
+                                    Cancelar
+
+                                </a>
+
+
+                                <a
+                                    href="../index.php"
+                                    class="btn btn-dark"
+                                >
+
+                                    ← Volver al dashboard
+
+                                </a>
 
 
                             </div>
+
 
                         </form>
 
@@ -329,43 +423,64 @@ $resultadoCursos = $conexion->query($sqlCursos);
                 </div>
 
 
-                <!-- LISTADO -->
+                <!-- =================================================
+                     LISTA DE CURSOS
+                ================================================== -->
 
                 <div class="card shadow">
 
-                    <div class="card-header bg-dark text-white">
+
+                    <div
+                        class="card-header bg-dark text-white"
+                    >
 
                         <h5 class="mb-0">
+
                             Cursos registrados
+
                         </h5>
 
                     </div>
 
 
-                    <div class="card-body p-0">
+                    <div class="card-body">
 
 
-                        <?php if ($resultadoCursos && $resultadoCursos->num_rows > 0): ?>
+                        <?php
+
+                        if (
+                            $resultadoCursos &&
+                            $resultadoCursos->num_rows > 0
+                        ):
+
+                        ?>
 
 
                             <div class="table-responsive">
 
-                                <table class="table table-bordered table-hover mb-0">
+                                <table
+                                    class="table table-bordered
+                                    table-hover align-middle mb-0"
+                                >
+
 
                                     <thead class="table-light">
 
                                         <tr>
 
-                                            <th width="80">
+                                            <th
+                                                style="width:100px;"
+                                            >
+
                                                 #
+
                                             </th>
+
 
                                             <th>
-                                                Curso
-                                            </th>
 
-                                            <th width="150">
-                                                Acción
+                                                Curso
+
                                             </th>
 
                                         </tr>
@@ -376,54 +491,48 @@ $resultadoCursos = $conexion->query($sqlCursos);
                                     <tbody>
 
 
-                                        <?php
+                                    <?php
 
-                                        $numero = 1;
+                                    $contador = 1;
 
-                                        while ($curso = $resultadoCursos->fetch_assoc()):
 
-                                        ?>
+                                    while (
+                                        $curso =
+                                        $resultadoCursos->fetch_assoc()
+                                    ):
 
-                                            <tr>
+                                    ?>
 
-                                                <td>
-                                                    <?= $numero++ ?>
-                                                </td>
 
-                                                <td>
-                                                    <?= htmlspecialchars($curso["nombre"]) ?>
-                                                </td>
+                                        <tr>
 
-                                                <td>
+                                            <td>
 
-                                                    <form
-                                                        method="POST"
-                                                        onsubmit="return confirm('¿Está seguro de eliminar este curso?');"
-                                                    >
+                                                <?= $contador++ ?>
 
-                                                        <input
-                                                            type="hidden"
-                                                            name="curso_id"
-                                                            value="<?= (int) $curso["id"] ?>"
-                                                        >
+                                            </td>
 
-                                                        <button
-                                                            type="submit"
-                                                            name="eliminar_curso"
-                                                            class="btn btn-danger btn-sm"
-                                                        >
 
-                                                            Eliminar
+                                            <td>
 
-                                                        </button>
+                                                <strong>
 
-                                                    </form>
+                                                    <?= htmlspecialchars(
+                                                        $curso["nombre"]
+                                                    ) ?>
 
-                                                </td>
+                                                </strong>
 
-                                            </tr>
+                                            </td>
 
-                                        <?php endwhile; ?>
+                                        </tr>
+
+
+                                    <?php
+
+                                    endwhile;
+
+                                    ?>
 
 
                                     </tbody>
@@ -435,11 +544,13 @@ $resultadoCursos = $conexion->query($sqlCursos);
 
                         <?php else: ?>
 
-                            <div class="alert alert-info m-3">
+
+                            <div class="alert alert-info mb-0">
 
                                 No hay cursos registrados todavía.
 
                             </div>
+
 
                         <?php endif; ?>
 
@@ -458,9 +569,8 @@ $resultadoCursos = $conexion->query($sqlCursos);
 </div>
 
 
-<?php include("../../includes/footer.php"); ?>
+<?php
 
+include("../../includes/footer.php");
 
-</body>
-
-</html>
+?>
