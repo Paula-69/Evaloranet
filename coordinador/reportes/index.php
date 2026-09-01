@@ -71,7 +71,6 @@ $sql = $conexion->query("
 ");
 
 
-// Guardamos los colores para poder usarlos después
 $resumen_colores = [];
 
 if ($sql) {
@@ -123,34 +122,6 @@ $sqlCargaDocente = "
 
 $resultadoCargaDocente =
     $conexion->query($sqlCargaDocente);
-
-
-// =====================================================
-// MATERIAS
-// =====================================================
-
-$sqlMateriasAsignadas = "
-    SELECT
-
-        m.nombre AS materia,
-
-        COUNT(ca.id) AS total
-
-    FROM materias m
-
-    LEFT JOIN carga_academica ca
-        ON ca.materia_id = m.id
-
-    GROUP BY
-        m.id,
-        m.nombre
-
-    ORDER BY
-        m.nombre ASC
-";
-
-$resultadoMateriasAsignadas =
-    $conexion->query($sqlMateriasAsignadas);
 
 
 // =====================================================
@@ -728,127 +699,6 @@ $resultadoEstudiantesCurso =
                             <div class="alert alert-info">
 
                                 No hay estudiantes registrados.
-
-                            </div>
-
-                        <?php endif; ?>
-
-                    </div>
-
-                </div>
-
-
-                <!-- =================================================
-                     MATERIAS
-                ================================================== -->
-
-                <div class="card shadow mb-4">
-
-                    <div class="card-header bg-info text-white">
-
-                        <h5 class="mb-0">
-
-                            Materias y asignaciones
-
-                        </h5>
-
-                    </div>
-
-
-                    <div class="card-body">
-
-                        <?php if (
-                            $resultadoMateriasAsignadas &&
-                            $resultadoMateriasAsignadas->num_rows > 0
-                        ): ?>
-
-
-                            <div class="table-responsive">
-
-                                <table
-                                    class="table table-bordered
-                                    table-hover"
-                                >
-
-                                    <thead class="table-light">
-
-                                        <tr>
-
-                                            <th>
-                                                #
-                                            </th>
-
-                                            <th>
-                                                Materia
-                                            </th>
-
-                                            <th>
-                                                Asignaciones
-                                            </th>
-
-                                        </tr>
-
-                                    </thead>
-
-
-                                    <tbody>
-
-
-                                    <?php
-
-                                    $contador = 1;
-
-                                    while (
-                                        $fila =
-                                        $resultadoMateriasAsignadas->fetch_assoc()
-                                    ):
-
-                                    ?>
-
-                                        <tr>
-
-                                            <td>
-                                                <?= $contador++ ?>
-                                            </td>
-
-                                            <td>
-
-                                                <?= htmlspecialchars(
-                                                    $fila["materia"]
-                                                ) ?>
-
-                                            </td>
-
-                                            <td>
-
-                                                <span
-                                                    class="badge bg-info"
-                                                >
-
-                                                    <?= (int)
-                                                        $fila["total"] ?>
-
-                                                </span>
-
-                                            </td>
-
-                                        </tr>
-
-                                    <?php endwhile; ?>
-
-
-                                    </tbody>
-
-                                </table>
-
-                            </div>
-
-
-                        <?php else: ?>
-
-                            <div class="alert alert-info">
-
-                                No hay materias registradas.
 
                             </div>
 

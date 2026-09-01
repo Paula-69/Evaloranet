@@ -6,31 +6,46 @@ require_once("../../config/config.php");
 require_once("../../config/seguridad/docente.php");
 
 
-/*
-|--------------------------------------------------------------------------
-| Validar datos
-|--------------------------------------------------------------------------
-*/
+// ======================================================
+// SOLO PERMITIR POST
+// ======================================================
 
 if ($_SERVER["REQUEST_METHOD"] !== "POST") {
 
-    header("Location: index.php");
-
+    header("Location: ../index.php");
     exit();
 
 }
 
 
-$curso_id = intval($_POST["curso_id"] ?? 0);
-$materia_id = intval($_POST["materia_id"] ?? 0);
+// ======================================================
+// DATOS RECIBIDOS DESDE DESEMPEÑO
+// ======================================================
+
+$curso_id = intval(
+    $_POST["curso_id"] ?? 0
+);
+
+$materia_id = intval(
+    $_POST["materia_id"] ?? 0
+);
 
 $colores = $_POST["color"] ?? [];
 
 
-if ($curso_id <= 0 || $materia_id <= 0) {
+// ======================================================
+// VALIDAR DATOS
+// ======================================================
+
+if (
+    $curso_id <= 0 ||
+    $materia_id <= 0 ||
+    !is_array($colores)
+) {
 
     header(
-        "Location: index.php?error=Datos inválidos."
+        "Location: ../desempeno/index.php?error=" .
+        urlencode("Datos de desempeño inválidos.")
     );
 
     exit();
@@ -38,22 +53,42 @@ if ($curso_id <= 0 || $materia_id <= 0) {
 }
 
 
-/*
-|--------------------------------------------------------------------------
-| Obtener docente
-|--------------------------------------------------------------------------
-*/
+// ======================================================
+// OBTENER DOCENTE
+// ======================================================
 
-$usuario_id = $_SESSION["id"];
+$usuario_id = intval(
+    $_SESSION["id"] ?? 0
+);
 
-$sql = "
+
+if ($usuario_id <= 0) {
+
+    header(
+        "Location: ../index.php"
+    );
+
+    exit();
+
+}
+
+
+$stmt = $conexion->prepare("
     SELECT id
     FROM docentes
     WHERE usuario_id = ?
     LIMIT 1
-";
+");
 
-$stmt = $conexion->prepare($sql);
+
+if (!$stmt) {
+
+    die(
+        "Error preparando consulta del docente."
+    );
+
+}
+
 
 $stmt->bind_param(
     "i",
@@ -62,36 +97,52 @@ $stmt->bind_param(
 
 $stmt->execute();
 
-$resultado = $stmt->get_result();
+$resultado =
+    $stmt->get_result();
 
 
-if ($resultado->num_rows == 0) {
+if ($resultado->num_rows === 0) {
 
-    die("No se encontró el docente.");
+    $stmt->close();
+
+    die(
+        "No se encontró el docente."
+    );
 
 }
 
+
 $docente = $resultado->fetch_assoc();
 
-$docente_id = $docente["id"];
+$docente_id = intval(
+    $docente["id"]
+);
+
+$stmt->close();
 
 
-/*
-|--------------------------------------------------------------------------
-| Verificar que el docente tenga esa carga académica
-|--------------------------------------------------------------------------
-*/
+// ======================================================
+// VERIFICAR QUE EL DOCENTE TENGA LA CARGA
+// ======================================================
 
-$sql = "
+$stmt = $conexion->prepare("
     SELECT id
     FROM carga_academica
     WHERE docente_id = ?
     AND curso_id = ?
     AND materia_id = ?
     LIMIT 1
-";
+");
 
-$stmt = $conexion->prepare($sql);
+
+if (!$stmt) {
+
+    die(
+        "Error preparando la carga académica."
+    );
+
+}
+
 
 $stmt->bind_param(
     "iii",
@@ -102,13 +153,19 @@ $stmt->bind_param(
 
 $stmt->execute();
 
-$resultado = $stmt->get_result();
+$resultado =
+    $stmt->get_result();
 
 
-if ($resultado->num_rows == 0) {
+if ($resultado->num_rows === 0) {
+
+    $stmt->close();
 
     header(
-        "Location: index.php?error=No tienes asignada esta materia."
+        "Location: ../desempeno/index.php?error=" .
+        urlencode(
+            "No tienes asignada esta materia para este curso."
+        )
     );
 
     exit();
@@ -116,54 +173,214 @@ if ($resultado->num_rows == 0) {
 }
 
 
-/*
-|--------------------------------------------------------------------------
-| Preparar INSERT / UPDATE
-|--------------------------------------------------------------------------
-*/
+$carga = $resultado->fetch_assoc();
 
-$sql = "
-    INSERT INTO seguimiento_desempeno
-    (
-        estudiante_id,
-        docente_id,
-        curso_id,
-        materia_id,
-        color_id
-    )
+$carga_id = intval(
+    $carga["id"]
+);
 
-    VALUES (?, ?, ?, ?, ?)
-
-    ON DUPLICATE KEY UPDATE
-
-        color_id = VALUES(color_id),
-
-        fecha_actualizacion = CURRENT_TIMESTAMP
-";
-
-$stmt = $conexion->prepare($sql);
+$stmt->close();
 
 
-/*
-|--------------------------------------------------------------------------
-| Guardar cada estudiante
-|--------------------------------------------------------------------------
-*/
+// ======================================================
+// OBTENER PERÍODO
+// ======================================================
+//
+// Como tu sistema maneja un período seleccionado
+// en la URL del reporte, lo recibimos desde el formulario.
+// ======================================================
 
-foreach ($colores as $estudiante_id => $color_id) {
+$periodo_id = intval(
+    $_POST["periodo_id"] ?? 0
+);
 
-    $estudiante_id = intval($estudiante_id);
-    $color_id = intval($color_id);
+
+// ======================================================
+// SI NO LLEGÓ PERÍODO, INTENTAR USAR EL PRIMERO
+// HABILITADO
+// ======================================================
+
+if ($periodo_id <= 0) {
+
+    $resultadoPeriodo =
+        $conexion->query("
+            SELECT id
+            FROM periodos
+            WHERE habilitado = 1
+            ORDER BY id ASC
+            LIMIT 1
+        ");
 
 
-    /*
-     * Solo permitimos los colores
-     * existentes en colores_desempeno.
-     */
+    if (
+        $resultadoPeriodo &&
+        $resultadoPeriodo->num_rows > 0
+    ) {
+
+        $periodo =
+            $resultadoPeriodo->fetch_assoc();
+
+        $periodo_id =
+            intval($periodo["id"]);
+
+    }
+
+}
+
+
+// ======================================================
+// VALIDAR PERÍODO
+// ======================================================
+
+if ($periodo_id <= 0) {
+
+    header(
+        "Location: ../desempeno/index.php?id=" .
+        $carga_id .
+        "&error=" .
+        urlencode(
+            "No hay un período válido seleccionado."
+        )
+    );
+
+    exit();
+
+}
+
+
+$stmt = $conexion->prepare("
+    SELECT
+        id,
+        nombre,
+        habilitado
+    FROM periodos
+    WHERE id = ?
+    LIMIT 1
+");
+
+
+if (!$stmt) {
+
+    die(
+        "Error preparando consulta del período."
+    );
+
+}
+
+
+$stmt->bind_param(
+    "i",
+    $periodo_id
+);
+
+$stmt->execute();
+
+$resultado =
+    $stmt->get_result();
+
+
+if ($resultado->num_rows === 0) {
+
+    $stmt->close();
+
+    header(
+        "Location: ../desempeno/index.php?id=" .
+        $carga_id .
+        "&error=" .
+        urlencode(
+            "El período seleccionado no existe."
+        )
+    );
+
+    exit();
+
+}
+
+
+$periodo =
+    $resultado->fetch_assoc();
+
+$stmt->close();
+
+
+// ======================================================
+// BLOQUEAR SI EL COORDINADOR DESHABILITÓ EL PERÍODO
+// ======================================================
+
+if (
+    intval($periodo["habilitado"]) !== 1
+) {
+
+    header(
+        "Location: ../desempeno/index.php?id=" .
+        $carga_id .
+        "&periodo_id=" .
+        $periodo_id .
+        "&error=" .
+        urlencode(
+            "El período está deshabilitado por el coordinador."
+        )
+    );
+
+    exit();
+
+}
+
+
+// ======================================================
+// PREPARAR INSERT / UPDATE
+// ======================================================
+
+$stmt = $conexion->prepare("
+    SELECT id
+    FROM desempeno_estudiantes
+
+    WHERE estudiante_id = ?
+    AND carga_academica_id = ?
+    AND periodo_id = ?
+
+    LIMIT 1
+");
+
+
+if (!$stmt) {
+
+    die(
+        "Error preparando consulta de desempeño."
+    );
+
+}
+
+
+// ======================================================
+// GUARDAR CADA ESTUDIANTE
+// ======================================================
+
+$guardados = 0;
+
+
+foreach (
+    $colores as $estudiante_id => $color_id
+) {
+
+    $estudiante_id =
+        intval($estudiante_id);
+
+    $color_id =
+        intval($color_id);
+
+
+    // --------------------------------------------------
+    // IGNORAR SI NO HAY DESEMPEÑO SELECCIONADO
+    // --------------------------------------------------
 
     if (
         $estudiante_id <= 0 ||
-        !in_array($color_id, [1, 2, 3])
+        !in_array(
+            $color_id,
+            [1, 2, 3],
+            true
+        )
     ) {
 
         continue;
@@ -171,71 +388,215 @@ foreach ($colores as $estudiante_id => $color_id) {
     }
 
 
-    /*
-     * Verificar que el estudiante
-     * pertenezca al curso seleccionado.
-     */
+    // --------------------------------------------------
+    // VERIFICAR ESTUDIANTE
+    // --------------------------------------------------
 
-    $sql_verificar = "
-        SELECT id
-        FROM estudiantes
-        WHERE id = ?
-        AND curso_id = ?
-        AND estado = 'Activo'
-        LIMIT 1
-    ";
+    $verificarEstudiante =
+        $conexion->prepare("
+            SELECT id
+            FROM estudiantes
 
-    $verificar = $conexion->prepare($sql_verificar);
+            WHERE id = ?
+            AND curso_id = ?
+            AND estado = 'Activo'
 
-    $verificar->bind_param(
-        "ii",
-        $estudiante_id,
-        $curso_id
-    );
-
-    $verificar->execute();
-
-    $resultado_estudiante =
-        $verificar->get_result();
+            LIMIT 1
+        ");
 
 
-    if ($resultado_estudiante->num_rows == 0) {
+    if (!$verificarEstudiante) {
 
         continue;
 
     }
 
 
-    /*
-     * Guardar seguimiento.
-     */
+    $verificarEstudiante->bind_param(
+        "ii",
+        $estudiante_id,
+        $curso_id
+    );
+
+    $verificarEstudiante->execute();
+
+    $resultadoEstudiante =
+        $verificarEstudiante->get_result();
+
+
+    if (
+        $resultadoEstudiante->num_rows === 0
+    ) {
+
+        $verificarEstudiante->close();
+
+        continue;
+
+    }
+
+
+    $verificarEstudiante->close();
+
+
+    // --------------------------------------------------
+    // BUSCAR DESEMPEÑO EXISTENTE
+    // --------------------------------------------------
 
     $stmt->bind_param(
-        "iiiii",
+        "iii",
         $estudiante_id,
-        $docente_id,
-        $curso_id,
-        $materia_id,
-        $color_id
+        $carga_id,
+        $periodo_id
     );
 
     $stmt->execute();
 
+    $resultado =
+        $stmt->get_result();
+
+
+    // --------------------------------------------------
+    // ACTUALIZAR
+    // --------------------------------------------------
+
+    if (
+        $resultado->num_rows > 0
+    ) {
+
+        $registro =
+            $resultado->fetch_assoc();
+
+        $registro_id =
+            intval($registro["id"]);
+
+
+        $actualizar =
+            $conexion->prepare("
+                UPDATE desempeno_estudiantes
+
+                SET color_id = ?
+
+                WHERE id = ?
+            ");
+
+
+        if (!$actualizar) {
+
+            continue;
+
+        }
+
+
+        $actualizar->bind_param(
+            "ii",
+            $color_id,
+            $registro_id
+        );
+
+
+        if (
+            $actualizar->execute()
+        ) {
+
+            $guardados++;
+
+        }
+
+
+        $actualizar->close();
+
+
+    } else {
+
+
+        // --------------------------------------------------
+        // INSERTAR
+        // --------------------------------------------------
+
+        $insertar =
+            $conexion->prepare("
+                INSERT INTO desempeno_estudiantes
+                (
+                    estudiante_id,
+                    carga_academica_id,
+                    periodo_id,
+                    color_id
+                )
+
+                VALUES
+                (
+                    ?,
+                    ?,
+                    ?,
+                    ?
+                )
+            ");
+
+
+        if (!$insertar) {
+
+            continue;
+
+        }
+
+
+        $insertar->bind_param(
+            "iiii",
+            $estudiante_id,
+            $carga_id,
+            $periodo_id,
+            $color_id
+        );
+
+
+        if (
+            $insertar->execute()
+        ) {
+
+            $guardados++;
+
+        }
+
+
+        $insertar->close();
+
+    }
+
 }
 
 
-/*
-|--------------------------------------------------------------------------
-| Volver
-|--------------------------------------------------------------------------
-*/
+$stmt->close();
+
+
+// ======================================================
+// RESULTADO
+// ======================================================
+
+if ($guardados > 0) {
+
+    $mensaje =
+        "Desempeño guardado correctamente.";
+
+} else {
+
+    $mensaje =
+        "No se seleccionó ningún desempeño.";
+
+}
+
+
+// ======================================================
+// REGRESAR AL REPORTE
+// ======================================================
 
 header(
-    "Location: index.php"
-    . "?curso_id=" . $curso_id
-    . "&materia_id=" . $materia_id
+    "Location: ../desempeno/index.php"
+    . "?id=" . $carga_id
+    . "&periodo_id=" . $periodo_id
     . "&success="
-    . urlencode("Seguimiento guardado correctamente.")
+    . urlencode($mensaje)
 );
 
 exit();
+
+?>

@@ -788,3 +788,198 @@ footer {
 
     min-height: calc(100vh - 64px);
 }
+/* ======================================================
+   SEMÁFORO DE DESEMPEÑO
+====================================================== */
+
+.btn-desempeno {
+
+    display: inline-flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    gap: 6px;
+
+    min-width: 105px;
+
+    margin: 2px;
+
+    /* Sin seleccionar: cuadro blanco */
+    background-color: #ffffff !important;
+
+    transition:
+        background-color 0.2s ease,
+        color 0.2s ease,
+        border-color 0.2s ease,
+        transform 0.15s ease;
+}
+
+
+/* ======================================================
+   CÍRCULO DEL SEMÁFORO
+====================================================== */
+
+.circulo-semaforo {
+
+    width: 18px;
+
+    height: 18px;
+
+    border-radius: 50%;
+
+    display: inline-block;
+
+    /* Círculo vacío */
+    background-color: #ffffff;
+
+    /* El borde toma el color del desempeño */
+    border: 2px solid currentColor;
+
+    transition:
+        background-color 0.2s ease,
+        border-color 0.2s ease,
+        transform 0.15s ease;
+}
+
+
+/* ======================================================
+   COLORES
+====================================================== */
+
+.btn-bajo {
+
+    color: #dc3545 !important;
+
+    border-color: #dc3545 !important;
+}
+
+
+.btn-basico {
+
+    color: #ffc107 !important;
+
+    border-color: #ffc107 !important;
+}
+
+
+.btn-alto {
+
+    color: #198754 !important;
+
+    border-color: #198754 !important;
+}
+
+
+/* ======================================================
+   BAJO SELECCIONADO
+   CUADRO + CÍRCULO ROJO
+====================================================== */
+
+.btn-bajo.seleccionado {
+
+    background-color: #dc3545 !important;
+
+    border-color: #dc3545 !important;
+
+    color: #ffffff !important;
+}
+
+
+.btn-bajo.seleccionado
+.circulo-semaforo {
+
+    background-color: #dc3545;
+
+    border-color: #ffffff;
+
+    transform: scale(1.05);
+}
+
+
+/* ======================================================
+   BÁSICO SELECCIONADO
+   CUADRO + CÍRCULO AMARILLO
+====================================================== */
+
+.btn-basico.seleccionado {
+
+    background-color: #ffc107 !important;
+
+    border-color: #ffc107 !important;
+
+    color: #212529 !important;
+}
+
+
+.btn-basico.seleccionado
+.circulo-semaforo {
+
+    background-color: #ffc107;
+
+    border-color: #212529;
+
+    transform: scale(1.05);
+}
+
+
+/* ======================================================
+   ALTO SELECCIONADO
+   CUADRO + CÍRCULO VERDE
+====================================================== */
+
+.btn-alto.seleccionado {
+
+    background-color: #198754 !important;
+
+    border-color: #198754 !important;
+
+    color: #ffffff !important;
+}
+
+
+.btn-alto.seleccionado
+.circulo-semaforo {
+
+    background-color: #198754;
+
+    border-color: #ffffff;
+
+    transform: scale(1.05);
+}
+
+
+/* ======================================================
+   EFECTO AL PASAR EL MOUSE
+====================================================== */
+
+.btn-desempeno:hover {
+
+    transform: translateY(-1px);
+}
+
+
+/* ======================================================
+   MANTENER COLOR AL PASAR EL MOUSE
+====================================================== */
+
+.btn-bajo.seleccionado:hover {
+
+    background-color: #dc3545 !important;
+    color: #ffffff !important;
+}
+
+
+.btn-basico.seleccionado:hover {
+
+    background-color: #ffc107 !important;
+    color: #212529 !important;
+}
+
+
+.btn-alto.seleccionado:hover {
+
+    background-color: #198754 !important;
+    color: #ffffff !important;
+} 

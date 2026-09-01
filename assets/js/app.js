@@ -525,3 +525,129 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 
 });
+/* ======================================================
+   SEMÁFORO DE DESEMPEÑO
+====================================================== */
+
+document.addEventListener("DOMContentLoaded", function () {
+
+    const botones =
+        document.querySelectorAll(".btn-desempeno");
+
+
+    botones.forEach(function (boton) {
+
+        boton.addEventListener("click", function () {
+
+            const fila =
+                boton.closest("tr");
+
+
+            if (!fila) {
+                return;
+            }
+
+
+            // Quitar selección de la fila
+
+            fila
+                .querySelectorAll(".btn-desempeno")
+                .forEach(function (btn) {
+
+                    btn.classList.remove(
+                        "seleccionado"
+                    );
+
+                });
+
+
+            // Seleccionar el botón actual
+
+            boton.classList.add(
+                "seleccionado"
+            );
+
+
+            // Obtener estudiante y color
+
+            const estudianteId =
+                boton.dataset.estudiante;
+
+            const colorId =
+                boton.dataset.color;
+
+
+            // Buscar el formulario
+
+            const formulario =
+                boton.closest("form");
+
+
+            if (!formulario) {
+                return;
+            }
+
+
+            /*
+             * Crear/actualizar el estudiante
+             * y color que se enviarán.
+             */
+
+            let inputEstudiante =
+                formulario.querySelector(
+                    'input[name="estudiante_id"]'
+                );
+
+
+            if (!inputEstudiante) {
+
+                inputEstudiante =
+                    document.createElement("input");
+
+                inputEstudiante.type = "hidden";
+
+                inputEstudiante.name =
+                    "estudiante_id";
+
+                formulario.appendChild(
+                    inputEstudiante
+                );
+
+            }
+
+
+            let inputColor =
+                formulario.querySelector(
+                    'input[name="color_id"]'
+                );
+
+
+            if (!inputColor) {
+
+                inputColor =
+                    document.createElement("input");
+
+                inputColor.type = "hidden";
+
+                inputColor.name =
+                    "color_id";
+
+                formulario.appendChild(
+                    inputColor
+                );
+
+            }
+
+
+            inputEstudiante.value =
+                estudianteId;
+
+
+            inputColor.value =
+                colorId;
+
+        });
+
+    });
+
+});

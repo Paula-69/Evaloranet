@@ -7,10 +7,13 @@ require_once("../../config/seguridad/docente.php");
 
 
 // ======================================================
-// VERIFICAR ID DE CARGA ACADÉMICA
+// VALIDAR ID DE CARGA
 // ======================================================
 
-if (!isset($_GET["id"]) || !is_numeric($_GET["id"])) {
+if (
+    !isset($_GET["id"]) ||
+    !is_numeric($_GET["id"])
+) {
 
     header("Location: ../index.php");
     exit();
@@ -21,10 +24,18 @@ $carga_id = (int) $_GET["id"];
 
 
 // ======================================================
-// BUSCAR DOCENTE LOGUEADO
+// OBTENER DOCENTE
 // ======================================================
 
-$usuario_id = $_SESSION["id"];
+$usuario_id = $_SESSION["id"] ?? 0;
+
+if ($usuario_id <= 0) {
+
+    header("Location: ../index.php");
+    exit();
+
+}
+
 
 $stmt = $conexion->prepare("
     SELECT id
@@ -33,16 +44,24 @@ $stmt = $conexion->prepare("
     LIMIT 1
 ");
 
-$stmt->bind_param("i", $usuario_id);
+$stmt->bind_param(
+    "i",
+    $usuario_id
+);
+
 $stmt->execute();
 
 $resultado = $stmt->get_result();
 
+
 if ($resultado->num_rows === 0) {
 
-    die("No se encontró el perfil del docente.");
+    $stmt->close();
+
+    die("No se encontró el docente.");
 
 }
+
 
 $docente = $resultado->fetch_assoc();
 
@@ -52,7 +71,7 @@ $stmt->close();
 
 
 // ======================================================
-// OBTENER INFORMACIÓN DE LA CARGA
+// OBTENER CARGA ACADÉMICA
 // ======================================================
 
 $stmt = $conexion->prepare("
@@ -61,8 +80,10 @@ $stmt = $conexion->prepare("
         ca.docente_id,
         ca.curso_id,
         ca.materia_id,
+
         c.nombre AS curso,
         m.nombre AS materia
+
     FROM carga_academica ca
 
     INNER JOIN cursos c
@@ -77,6 +98,14 @@ $stmt = $conexion->prepare("
     LIMIT 1
 ");
 
+
+if (!$stmt) {
+
+    die("Error preparando la carga académica.");
+
+}
+
+
 $stmt->bind_param(
     "ii",
     $carga_id,
@@ -87,11 +116,15 @@ $stmt->execute();
 
 $resultado = $stmt->get_result();
 
+
 if ($resultado->num_rows === 0) {
 
-    die("Esta asignación no pertenece al docente.");
+    $stmt->close();
+
+    die("Esta carga académica no pertenece al docente.");
 
 }
+
 
 $carga = $resultado->fetch_assoc();
 
@@ -99,365 +132,232 @@ $stmt->close();
 
 
 // ======================================================
+// PERÍODO
+// ======================================================
+
+$periodo_id = isset($_GET["periodo_id"])
+    ? (int) $_GET["periodo_id"]
+    : 0;
+
+
+// ======================================================
 // OBTENER PERÍODOS
 // ======================================================
 
-$periodos = $conexion->query("
+$periodos = [];
+
+$resultadoPeriodos = $conexion->query("
     SELECT
         id,
-        nombre
+        nombre,
+        habilitado
     FROM periodos
     ORDER BY id ASC
 ");
 
 
+if ($resultadoPeriodos) {
+
+    while (
+        $periodo = $resultadoPeriodos->fetch_assoc()
+    ) {
+
+        $periodos[] = $periodo;
+
+    }
+
+}
+
+
 // ======================================================
-// DETERMINAR PERÍODO ACTUAL
+// SI NO HAY PERÍODO SELECCIONADO
+// BUSCAR UNO HABILITADO
 // ======================================================
 
-$periodo_id = isset($_GET["periodo_id"])
-    ? (int) $_GET["periodo_id"]
-    : 1;
+if ($periodo_id <= 0) {
+
+    foreach ($periodos as $periodo) {
+
+        if (
+            (int)$periodo["habilitado"] === 1
+        ) {
+
+            $periodo_id =
+                (int)$periodo["id"];
+
+            break;
+
+        }
+
+    }
+
+}
 
 
 // ======================================================
-// VERIFICAR QUE EL PERÍODO EXISTA
+// OBTENER PERÍODO ACTUAL
 // ======================================================
 
-$verificar_periodo = $conexion->prepare("
-    SELECT
-        id,
-        nombre
-    FROM periodos
-    WHERE id = ?
-    LIMIT 1
-");
+$periodo_actual = null;
 
-$verificar_periodo->bind_param(
-    "i",
-    $periodo_id
-);
-
-$verificar_periodo->execute();
-
-$resultado_periodo = $verificar_periodo->get_result();
+$periodo_bloqueado = false;
 
 
-// Si no existe, utilizar período 1
+if ($periodo_id > 0) {
 
-if ($resultado_periodo->num_rows === 0) {
-
-    $periodo_id = 1;
-
-    $verificar_periodo->close();
-
-    $verificar_periodo = $conexion->prepare("
+    $stmt = $conexion->prepare("
         SELECT
             id,
-            nombre
+            nombre,
+            habilitado
+
         FROM periodos
+
         WHERE id = ?
+
         LIMIT 1
     ");
 
-    $verificar_periodo->bind_param(
+    $stmt->bind_param(
         "i",
         $periodo_id
     );
 
-    $verificar_periodo->execute();
+    $stmt->execute();
 
-    $resultado_periodo = $verificar_periodo->get_result();
-
-}
-
-$periodo_actual = $resultado_periodo->fetch_assoc();
-
-$verificar_periodo->close();
+    $resultado =
+        $stmt->get_result();
 
 
-// ======================================================
-// GUARDAR DESEMPEÑO
-// ======================================================
+    if ($resultado->num_rows === 0) {
 
-if ($_SERVER["REQUEST_METHOD"] === "POST") {
+        $periodo_bloqueado = true;
 
+    } else {
 
-    $estudiante_id = isset($_POST["estudiante_id"])
-        ? (int) $_POST["estudiante_id"]
-        : 0;
+        $periodo_actual =
+            $resultado->fetch_assoc();
 
-
-    $color_id = isset($_POST["color_id"])
-        ? (int) $_POST["color_id"]
-        : 0;
-
-
-    $periodo_post = isset($_POST["periodo_id"])
-        ? (int) $_POST["periodo_id"]
-        : 0;
-
-
-    // ================================================
-    // VERIFICAR PERÍODO
-    // ================================================
-
-    if ($periodo_post > 0) {
-
-        $verificar = $conexion->prepare("
-            SELECT id
-            FROM periodos
-            WHERE id = ?
-            LIMIT 1
-        ");
-
-        $verificar->bind_param(
-            "i",
-            $periodo_post
-        );
-
-        $verificar->execute();
-
-        $resultado_verificar_periodo =
-            $verificar->get_result();
 
         if (
-            $resultado_verificar_periodo->num_rows === 1
+            (int)$periodo_actual["habilitado"] !== 1
         ) {
 
-            $periodo_id = $periodo_post;
+            $periodo_bloqueado = true;
 
         }
 
-        $verificar->close();
-
     }
 
-
-    // ================================================
-    // VALIDAR ESTUDIANTE Y COLOR
-    // ================================================
-
-    if (
-        $estudiante_id > 0 &&
-        $color_id > 0 &&
-        $periodo_id > 0
-    ) {
-
-
-        // ============================================
-        // VERIFICAR ESTUDIANTE
-        // ============================================
-
-        $verificar_estudiante = $conexion->prepare("
-            SELECT id
-            FROM estudiantes
-            WHERE id = ?
-            AND curso_id = ?
-            AND estado = 'Activo'
-            LIMIT 1
-        ");
-
-        $verificar_estudiante->bind_param(
-            "ii",
-            $estudiante_id,
-            $carga["curso_id"]
-        );
-
-        $verificar_estudiante->execute();
-
-        $resultado_estudiante =
-            $verificar_estudiante->get_result();
-
-
-        if ($resultado_estudiante->num_rows === 1) {
-
-
-            // ========================================
-            // BUSCAR DESEMPEÑO DEL PERÍODO
-            // ========================================
-
-            $buscar = $conexion->prepare("
-                SELECT id
-                FROM desempeno_estudiantes
-                WHERE estudiante_id = ?
-                AND carga_academica_id = ?
-                AND periodo_id = ?
-                LIMIT 1
-            ");
-
-            $buscar->bind_param(
-                "iii",
-                $estudiante_id,
-                $carga_id,
-                $periodo_id
-            );
-
-            $buscar->execute();
-
-            $resultado_buscar =
-                $buscar->get_result();
-
-
-            // ========================================
-            // ACTUALIZAR
-            // ========================================
-
-            if ($resultado_buscar->num_rows > 0) {
-
-
-                $registro =
-                    $resultado_buscar->fetch_assoc();
-
-                $registro_id =
-                    (int) $registro["id"];
-
-
-                $actualizar = $conexion->prepare("
-                    UPDATE desempeno_estudiantes
-                    SET
-                        color_id = ?,
-                        fecha_registro = CURRENT_TIMESTAMP
-                    WHERE id = ?
-                ");
-
-                $actualizar->bind_param(
-                    "ii",
-                    $color_id,
-                    $registro_id
-                );
-
-                $actualizar->execute();
-
-                $actualizar->close();
-
-
-            } else {
-
-
-                // ====================================
-                // INSERTAR
-                // ====================================
-
-                $insertar = $conexion->prepare("
-                    INSERT INTO desempeno_estudiantes
-                    (
-                        estudiante_id,
-                        carga_academica_id,
-                        periodo_id,
-                        color_id
-                    )
-                    VALUES (?, ?, ?, ?)
-                ");
-
-                $insertar->bind_param(
-                    "iiii",
-                    $estudiante_id,
-                    $carga_id,
-                    $periodo_id,
-                    $color_id
-                );
-
-                $insertar->execute();
-
-                $insertar->close();
-
-            }
-
-
-            $buscar->close();
-
-        }
-
-
-        $verificar_estudiante->close();
-
-    }
-
-
-    // ================================================
-    // REGRESAR AL MISMO PERÍODO
-    // ================================================
-
-    header(
-        "Location: index.php?id=" .
-        $carga_id .
-        "&periodo_id=" .
-        $periodo_id .
-        "&guardado=1"
-    );
-
-    exit();
+    $stmt->close();
 
 }
 
 
 // ======================================================
-// OBTENER COLORES
+// OBTENER ESTUDIANTES
 // ======================================================
 
-$colores = $conexion->query("
-    SELECT
-        id,
-        desempeno,
-        color
-    FROM colores_desempeno
-    ORDER BY id
-");
-
-
-// ======================================================
-// OBTENER ESTUDIANTES DEL CURSO
-// ======================================================
+$estudiantes = [];
 
 $stmt = $conexion->prepare("
     SELECT
-
-        e.id AS estudiante_id,
-
-        u.documento,
-
+        e.id,
         u.nombres,
-
         u.apellidos,
-
-        de.color_id,
-
-        cd.desempeno,
-
-        cd.color
+        u.documento
 
     FROM estudiantes e
 
     INNER JOIN usuarios u
         ON e.usuario_id = u.id
 
-    LEFT JOIN desempeno_estudiantes de
-        ON de.estudiante_id = e.id
-        AND de.carga_academica_id = ?
-        AND de.periodo_id = ?
-
-    LEFT JOIN colores_desempeno cd
-        ON de.color_id = cd.id
-
     WHERE e.curso_id = ?
     AND e.estado = 'Activo'
 
     ORDER BY
-        u.apellidos,
-        u.nombres
+        u.apellidos ASC,
+        u.nombres ASC
 ");
 
+
+if (!$stmt) {
+
+    die(
+        "Error preparando consulta de estudiantes."
+    );
+
+}
+
+
 $stmt->bind_param(
-    "iii",
-    $carga_id,
-    $periodo_id,
+    "i",
     $carga["curso_id"]
 );
 
 $stmt->execute();
 
-$estudiantes = $stmt->get_result();
+$resultado =
+    $stmt->get_result();
+
+
+while (
+    $estudiante = $resultado->fetch_assoc()
+) {
+
+    $estudiantes[] = $estudiante;
+
+}
+
+$stmt->close();
+
+
+// ======================================================
+// OBTENER DESEMPEÑOS YA GUARDADOS
+// ======================================================
+
+$desempenos = [];
+
+$stmt = $conexion->prepare("
+    SELECT
+        estudiante_id,
+        color_id
+
+    FROM desempeno_estudiantes
+
+    WHERE carga_academica_id = ?
+    AND periodo_id = ?
+");
+
+
+if ($stmt) {
+
+    $stmt->bind_param(
+        "ii",
+        $carga_id,
+        $periodo_id
+    );
+
+    $stmt->execute();
+
+    $resultado =
+        $stmt->get_result();
+
+
+    while (
+        $fila = $resultado->fetch_assoc()
+    ) {
+
+        $desempenos[
+            (int)$fila["estudiante_id"]
+        ] =
+            (int)$fila["color_id"];
+
+    }
+
+    $stmt->close();
+
+}
 
 
 // ======================================================
@@ -469,6 +369,102 @@ include("../../includes/header.php");
 include("../../includes/navbar.php");
 
 ?>
+
+
+<style>
+
+/* ======================================================
+   BOTONES DE DESEMPEÑO
+====================================================== */
+
+.btn-desempeno {
+
+    display: inline-flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    gap: 6px;
+
+    min-width: 95px;
+
+    margin: 2px;
+
+}
+
+
+/* ======================================================
+   CÍRCULO
+====================================================== */
+
+.circulo-semaforo {
+
+    width: 18px;
+
+    height: 18px;
+
+    border-radius: 50%;
+
+    display: inline-block;
+
+    background-color: white;
+
+    border: 2px solid currentColor;
+
+    transition:
+        background-color .2s ease,
+        transform .15s ease;
+
+}
+
+
+/* ======================================================
+   CÍRCULO SELECCIONADO
+====================================================== */
+
+.btn-desempeno.seleccionado
+.circulo-semaforo {
+
+    background-color: currentColor;
+
+    transform: scale(1.05);
+
+}
+
+
+/* ======================================================
+   COLORES
+====================================================== */
+
+.btn-bajo {
+
+    color: #dc3545;
+
+    border-color: #dc3545;
+
+}
+
+
+.btn-basico {
+
+    color: #ffc107;
+
+    border-color: #ffc107;
+
+}
+
+
+.btn-alto {
+
+    color: #198754;
+
+    border-color: #198754;
+
+}
+
+</style>
+
 
 <div class="container-fluid">
 
@@ -496,24 +492,26 @@ include("../../includes/navbar.php");
 
         <div class="col-md-10">
 
-            <div class="container mt-4">
+            <div class="container mt-4 mb-5">
 
 
                 <!-- ==================================================
                      ENCABEZADO
                 =================================================== -->
 
-                <div class="d-flex justify-content-between align-items-center mb-4">
+                <div
+                    class="d-flex justify-content-between
+                           align-items-center mb-4"
+                >
 
                     <div>
 
                         <h2>
-
                             Desempeño de estudiantes
-
                         </h2>
 
-                        <p class="text-muted mb-1">
+
+                        <p class="mb-1">
 
                             Curso:
 
@@ -527,7 +525,8 @@ include("../../includes/navbar.php");
 
                         </p>
 
-                        <p class="text-muted mb-0">
+
+                        <p class="mb-0">
 
                             Materia:
 
@@ -549,7 +548,7 @@ include("../../includes/navbar.php");
                         class="btn btn-secondary"
                     >
 
-                        Volver
+                        ← Volver
 
                     </a>
 
@@ -557,146 +556,18 @@ include("../../includes/navbar.php");
 
 
                 <!-- ==================================================
-                     SELECTOR DE PERÍODO
+                     MENSAJE DE ERROR
                 =================================================== -->
 
-                <div class="card shadow mb-4">
+                <?php if (
+                    isset($_GET["error"])
+                ): ?>
 
-                    <div class="card-header bg-primary text-white">
+                    <div class="alert alert-danger">
 
-                        <strong>
-
-                            📅 Período académico
-
-                        </strong>
-
-                    </div>
-
-
-                    <div class="card-body">
-
-                        <form
-                            method="GET"
-                            action="index.php"
-                            class="row align-items-end"
-                        >
-
-                            <input
-                                type="hidden"
-                                name="id"
-                                value="<?= $carga_id ?>"
-                            >
-
-
-                            <div class="col-md-6">
-
-                                <label
-                                    for="periodo_id"
-                                    class="form-label"
-                                >
-
-                                    Seleccione el período
-
-                                </label>
-
-
-                                <select
-                                    name="periodo_id"
-                                    id="periodo_id"
-                                    class="form-select"
-                                    required
-                                >
-
-                                    <?php
-
-                                    $periodos->data_seek(0);
-
-                                    while (
-                                        $periodo =
-                                        $periodos->fetch_assoc()
-                                    ):
-
-                                    ?>
-
-                                        <option
-                                            value="<?= (int) $periodo["id"] ?>"
-                                            <?= (
-                                                (int) $periodo["id"]
-                                                === $periodo_id
-                                            )
-                                                ? "selected"
-                                                : ""
-                                            ?>
-                                        >
-
-                                            <?= htmlspecialchars(
-                                                $periodo["nombre"]
-                                            ) ?>
-
-                                        </option>
-
-                                    <?php endwhile; ?>
-
-                                </select>
-
-                            </div>
-
-
-                            <div class="col-md-3 mt-3 mt-md-0">
-
-                                <button
-                                    type="submit"
-                                    class="btn btn-primary w-100"
-                                >
-
-                                    🔎 Ver período
-
-                                </button>
-
-                            </div>
-
-
-                        </form>
-
-
-                        <div class="alert alert-info mt-3 mb-0">
-
-                            Actualmente estás registrando el desempeño
-                            correspondiente a:
-
-                            <strong>
-
-                                <?= htmlspecialchars(
-                                    $periodo_actual["nombre"]
-                                ) ?>
-
-                            </strong>
-
-                        </div>
-
-                    </div>
-
-                </div>
-
-
-                <!-- ==================================================
-                     MENSAJE DE GUARDADO
-                =================================================== -->
-
-                <?php if (isset($_GET["guardado"])): ?>
-
-                    <div class="alert alert-success">
-
-                        El desempeño fue guardado correctamente
-                        en
-
-                        <strong>
-
-                            <?= htmlspecialchars(
-                                $periodo_actual["nombre"]
-                            ) ?>
-
-                        </strong>.
+                        <?= htmlspecialchars(
+                            $_GET["error"]
+                        ) ?>
 
                     </div>
 
@@ -704,66 +575,229 @@ include("../../includes/navbar.php");
 
 
                 <!-- ==================================================
-                     LEYENDA
+                     MENSAJE DE ÉXITO
+                =================================================== -->
+
+                <?php if (
+                    isset($_GET["success"])
+                ): ?>
+
+                    <div class="alert alert-success">
+
+                        ✅
+
+                        <?= htmlspecialchars(
+                            $_GET["success"]
+                        ) ?>
+
+                    </div>
+
+                <?php endif; ?>
+
+
+                <!-- ==================================================
+                     PERÍODO ACADÉMICO
                 =================================================== -->
 
                 <div class="card shadow mb-4">
 
-                    <div class="card-header bg-primary text-white">
+                    <div
+                        class="card-header
+                               bg-primary
+                               text-white"
+                    >
 
-                        <strong>
+                        <h5 class="mb-0">
 
-                            Niveles de desempeño
+                            📅 Período académico
 
-                        </strong>
+                        </h5>
 
                     </div>
 
 
                     <div class="card-body">
 
-                        <div class="row">
 
-                            <?php
+                        <?php
 
-                            $colores->data_seek(0);
+                        $periodos_habilitados =
+                            array_filter(
+                                $periodos,
+                                function ($periodo) {
 
-                            while (
-                                $color =
-                                $colores->fetch_assoc()
-                            ):
+                                    return
+                                        (int)$periodo[
+                                            "habilitado"
+                                        ] === 1;
 
-                            ?>
+                                }
+                            );
 
-                                <div class="col-md-4">
+                        ?>
+
+
+                        <?php if (
+                            count(
+                                $periodos_habilitados
+                            ) > 0
+                        ): ?>
+
+
+                            <form
+                                method="GET"
+                                action="index.php"
+                            >
+
+                                <input
+                                    type="hidden"
+                                    name="id"
+                                    value="<?= $carga_id ?>"
+                                >
+
+
+                                <div
+                                    class="row
+                                           align-items-end"
+                                >
+
 
                                     <div
-                                        class="p-3 rounded text-center"
-                                        style="
-                                            background-color:
-                                            <?= htmlspecialchars(
-                                                $color["color"]
-                                            ) ?>;
-                                        "
+                                        class="col-md-8"
                                     >
 
-                                        <strong>
+                                        <label
+                                            class="form-label"
+                                            for="periodo_id"
+                                        >
 
-                                            <?= htmlspecialchars(
-                                                ucfirst(
-                                                    $color["desempeno"]
-                                                )
-                                            ) ?>
+                                            Selecciona un período
+                                            habilitado
 
-                                        </strong>
+                                        </label>
+
+
+                                        <select
+                                            name="periodo_id"
+                                            id="periodo_id"
+                                            class="form-select"
+                                            required
+                                        >
+
+                                            <?php
+
+                                            foreach (
+                                                $periodos_habilitados
+                                                as $periodo
+                                            ):
+
+                                                $idPeriodo =
+                                                    (int)$periodo[
+                                                        "id"
+                                                    ];
+
+                                            ?>
+
+                                                <option
+                                                    value="<?= $idPeriodo ?>"
+
+                                                    <?= (
+                                                        $idPeriodo ===
+                                                        $periodo_id
+                                                    )
+                                                        ? "selected"
+                                                        : ""
+                                                    ?>
+                                                >
+
+                                                    <?= htmlspecialchars(
+                                                        $periodo[
+                                                            "nombre"
+                                                        ]
+                                                    ) ?>
+
+                                                    — 🟢 Habilitado
+
+                                                </option>
+
+                                            <?php endforeach; ?>
+
+                                        </select>
 
                                     </div>
 
+
+                                    <div
+                                        class="col-md-4
+                                               mt-3
+                                               mt-md-0"
+                                    >
+
+                                        <button
+                                            type="submit"
+                                            class="btn
+                                                   btn-primary
+                                                   w-100"
+                                        >
+
+                                            🔎 Ver período
+
+                                        </button>
+
+                                    </div>
+
+
                                 </div>
 
-                            <?php endwhile; ?>
+                            </form>
 
-                        </div>
+
+                        <?php else: ?>
+
+
+                            <div
+                                class="alert
+                                       alert-warning
+                                       mb-0"
+                            >
+
+                                ⚠️ No hay períodos
+                                habilitados actualmente.
+
+                            </div>
+
+
+                        <?php endif; ?>
+
+
+                        <?php if (
+                            $periodo_actual &&
+                            !$periodo_bloqueado
+                        ): ?>
+
+                            <div
+                                class="alert
+                                       alert-success
+                                       mt-3
+                                       mb-0"
+                            >
+
+                                Actualmente estás trabajando en:
+
+                                <strong>
+
+                                    <?= htmlspecialchars(
+                                        $periodo_actual[
+                                            "nombre"
+                                        ]
+                                    ) ?>
+
+                                </strong>
+
+                            </div>
+
+                        <?php endif; ?>
+
 
                     </div>
 
@@ -771,272 +805,412 @@ include("../../includes/navbar.php");
 
 
                 <!-- ==================================================
-                     TABLA
+                     PERÍODO BLOQUEADO
                 =================================================== -->
 
-                <div class="card shadow">
+                <?php if (
+                    $periodo_bloqueado
+                ): ?>
 
-                    <div class="card-header bg-dark text-white">
 
-                        <strong>
+                    <div
+                        class="alert
+                               alert-danger
+                               shadow-sm"
+                    >
 
-                            Estudiantes -
+                        <h5>
 
-                            <?= htmlspecialchars(
-                                $periodo_actual["nombre"]
-                            ) ?>
+                            🔒 Período no disponible
 
-                        </strong>
+                        </h5>
+
+
+                        <p class="mb-0">
+
+                            Este período está deshabilitado
+                            por el coordinador.
+
+                            No puedes registrar ni modificar
+                            desempeños en este período.
+
+                        </p>
 
                     </div>
 
 
-                    <div class="card-body p-0">
-
-                        <?php if (
-                            $estudiantes->num_rows === 0
-                        ): ?>
-
-                            <div class="alert alert-warning m-3">
-
-                                Este curso no tiene estudiantes activos.
-
-                            </div>
-
-                        <?php else: ?>
+                <?php endif; ?>
 
 
-                            <div class="table-responsive">
+                <!-- ==================================================
+                     TABLA DE ESTUDIANTES
+                =================================================== -->
 
-                                <table
-                                    class="table table-striped table-hover mb-0"
+                <?php if (
+                    $periodo_actual &&
+                    !$periodo_bloqueado
+                ): ?>
+
+
+                    <div class="card shadow">
+
+
+                        <div
+                            class="card-header
+                                   bg-success
+                                   text-white"
+                        >
+
+                            <h5 class="mb-0">
+
+                                Seguimiento de estudiantes -
+
+                                <?= htmlspecialchars(
+                                    $periodo_actual[
+                                        "nombre"
+                                    ]
+                                ) ?>
+
+                            </h5>
+
+                        </div>
+
+
+                        <div class="card-body">
+
+
+                            <?php if (
+                                count($estudiantes) > 0
+                            ): ?>
+
+
+                                <form
+                                    action="../seguimiento/guardar.php"
+                                    method="POST"
                                 >
 
-                                    <thead>
 
-                                        <tr>
-
-                                            <th>
-                                                #
-                                            </th>
-
-                                            <th>
-                                                Documento
-                                            </th>
-
-                                            <th>
-                                                Estudiante
-                                            </th>
-
-                                            <th>
-                                                Desempeño actual
-                                            </th>
-
-                                            <th>
-                                                Registrar
-                                            </th>
-
-                                        </tr>
-
-                                    </thead>
+                                    <input
+                                        type="hidden"
+                                        name="curso_id"
+                                        value="<?= (int)$carga["curso_id"] ?>"
+                                    >
 
 
-                                    <tbody>
+                                    <input
+                                        type="hidden"
+                                        name="materia_id"
+                                        value="<?= (int)$carga["materia_id"] ?>"
+                                    >
 
 
-                                    <?php
-
-                                    $numero = 1;
-
-                                    while (
-                                        $estudiante =
-                                        $estudiantes->fetch_assoc()
-                                    ):
-
-                                    ?>
-
-                                        <tr>
-
-                                            <td>
-
-                                                <?= $numero++ ?>
-
-                                            </td>
+                                    <input
+                                        type="hidden"
+                                        name="periodo_id"
+                                        value="<?= $periodo_id ?>"
+                                    >
 
 
-                                            <td>
-
-                                                <?= htmlspecialchars(
-                                                    $estudiante[
-                                                        "documento"
-                                                    ]
-                                                ) ?>
-
-                                            </td>
+                                    <div
+                                        class="table-responsive"
+                                    >
 
 
-                                            <td>
-
-                                                <?= htmlspecialchars(
-                                                    $estudiante[
-                                                        "nombres"
-                                                    ] .
-                                                    " " .
-                                                    $estudiante[
-                                                        "apellidos"
-                                                    ]
-                                                ) ?>
-
-                                            </td>
+                                        <table
+                                            class="table
+                                                   table-bordered
+                                                   table-hover
+                                                   align-middle"
+                                        >
 
 
-                                            <!-- =================================
-                                                 DESEMPEÑO ACTUAL
-                                            ================================== -->
+                                            <thead
+                                                class="table-light"
+                                            >
 
-                                            <td>
+                                                <tr>
 
-                                                <?php if (
-                                                    !empty(
-                                                        $estudiante[
-                                                            "color"
-                                                        ]
-                                                    )
-                                                ): ?>
+                                                    <th>
+                                                        #
+                                                    </th>
 
-                                                    <span
-                                                        class="badge p-2"
-                                                        style="
-                                                            background-color:
+                                                    <th>
+                                                        Estudiante
+                                                    </th>
+
+                                                    <th>
+                                                        Documento
+                                                    </th>
+
+                                                    <th
+                                                        class="text-center"
+                                                    >
+
+                                                        Desempeño
+
+                                                    </th>
+
+                                                </tr>
+
+                                            </thead>
+
+
+                                            <tbody>
+
+
+                                            <?php
+
+                                            foreach (
+                                                $estudiantes
+                                                as $numero =>
+                                                $estudiante
+                                            ):
+
+                                                $estudiante_id =
+                                                    (int)$estudiante[
+                                                        "id"
+                                                    ];
+
+
+                                                $color_actual =
+                                                    $desempenos[
+                                                        $estudiante_id
+                                                    ] ?? 0;
+
+                                            ?>
+
+
+                                                <tr>
+
+
+                                                    <td>
+
+                                                        <?= $numero + 1 ?>
+
+                                                    </td>
+
+
+                                                    <td>
+
+                                                        <strong>
+
                                                             <?= htmlspecialchars(
                                                                 $estudiante[
-                                                                    "color"
+                                                                    "apellidos"
                                                                 ]
-                                                            ) ?>;
-                                                        "
-                                                    >
+                                                            ) ?>
+
+                                                            ,
+
+                                                            <?= htmlspecialchars(
+                                                                $estudiante[
+                                                                    "nombres"
+                                                                ]
+                                                            ) ?>
+
+                                                        </strong>
+
+                                                    </td>
+
+
+                                                    <td>
 
                                                         <?= htmlspecialchars(
-                                                            ucfirst(
-                                                                $estudiante[
-                                                                    "desempeno"
-                                                                ]
-                                                            )
+                                                            $estudiante[
+                                                                "documento"
+                                                            ]
                                                         ) ?>
 
-                                                    </span>
-
-                                                <?php else: ?>
-
-                                                    <span
-                                                        class="badge bg-secondary"
-                                                    >
-
-                                                        Sin registrar
-
-                                                    </span>
-
-                                                <?php endif; ?>
-
-                                            </td>
+                                                    </td>
 
 
-                                            <!-- =================================
-                                                 BOTONES
-                                            ================================== -->
-
-                                            <td>
-
-                                                <form
-                                                    method="POST"
-                                                    class="d-flex gap-2"
-                                                >
-
-
-                                                    <input
-                                                        type="hidden"
-                                                        name="estudiante_id"
-                                                        value="<?= (int) $estudiante[
-                                                            "estudiante_id"
-                                                        ] ?>"
+                                                    <td
+                                                        class="text-center"
                                                     >
 
 
-                                                    <input
-                                                        type="hidden"
-                                                        name="periodo_id"
-                                                        value="<?= $periodo_id ?>"
-                                                    >
-
-
-                                                    <?php
-
-                                                    $colores->data_seek(0);
-
-                                                    while (
-                                                        $color =
-                                                        $colores->fetch_assoc()
-                                                    ):
-
-                                                    ?>
+                                                        <!-- ==================================
+                                                             BAJO
+                                                        =================================== -->
 
                                                         <button
-                                                            type="submit"
-                                                            name="color_id"
-                                                            value="<?= (int) $color["id"] ?>"
-                                                            class="btn btn-sm"
-                                                            style="
-                                                                background-color:
-                                                                <?= htmlspecialchars(
-                                                                    $color[
-                                                                        "color"
-                                                                    ]
-                                                                ) ?>;
-                                                                border: 1px solid #999;
-                                                            "
-                                                            title="<?= htmlspecialchars(
-                                                                ucfirst(
-                                                                    $color[
-                                                                        "desempeno"
-                                                                    ]
+                                                            type="button"
+
+                                                            class="
+                                                                btn
+                                                                btn-outline-danger
+                                                                btn-desempeno
+                                                                btn-bajo
+
+                                                                <?= (
+                                                                    $color_actual === 1
                                                                 )
-                                                            ) ?>"
+                                                                    ? 'seleccionado'
+                                                                    : ''
+                                                                ?>
+                                                            "
+
+                                                            data-color="1"
+
+                                                            data-estudiante="<?= $estudiante_id ?>"
                                                         >
 
-                                                            <?= htmlspecialchars(
-                                                                ucfirst(
-                                                                    $color[
-                                                                        "desempeno"
-                                                                    ]
-                                                                )
-                                                            ) ?>
+                                                            <span
+                                                                class="circulo-semaforo"
+                                                            ></span>
+
+                                                            Bajo
 
                                                         </button>
 
-                                                    <?php endwhile; ?>
 
-                                                </form>
+                                                        <!-- ==================================
+                                                             BÁSICO
+                                                        =================================== -->
 
-                                            </td>
+                                                        <button
+                                                            type="button"
 
-                                        </tr>
+                                                            class="
+                                                                btn
+                                                                btn-outline-warning
+                                                                btn-desempeno
+                                                                btn-basico
+
+                                                                <?= (
+                                                                    $color_actual === 2
+                                                                )
+                                                                    ? 'seleccionado'
+                                                                    : ''
+                                                                ?>
+                                                            "
+
+                                                            data-color="2"
+
+                                                            data-estudiante="<?= $estudiante_id ?>"
+                                                        >
+
+                                                            <span
+                                                                class="circulo-semaforo"
+                                                            ></span>
+
+                                                            Básico
+
+                                                        </button>
 
 
-                                    <?php endwhile; ?>
+                                                        <!-- ==================================
+                                                             ALTO
+                                                        =================================== -->
+
+                                                        <button
+                                                            type="button"
+
+                                                            class="
+                                                                btn
+                                                                btn-outline-success
+                                                                btn-desempeno
+                                                                btn-alto
+
+                                                                <?= (
+                                                                    $color_actual === 3
+                                                                )
+                                                                    ? 'seleccionado'
+                                                                    : ''
+                                                                ?>
+                                                            "
+
+                                                            data-color="3"
+
+                                                            data-estudiante="<?= $estudiante_id ?>"
+                                                        >
+
+                                                            <span
+                                                                class="circulo-semaforo"
+                                                            ></span>
+
+                                                            Alto
+
+                                                        </button>
 
 
-                                    </tbody>
+                                                        <!-- ==================================
+                                                             VALOR PARA GUARDAR
+                                                        =================================== -->
 
-                                </table>
+                                                        <input
+                                                            type="hidden"
 
-                            </div>
+                                                            name="color[<?= $estudiante_id ?>]"
+
+                                                            value="<?= $color_actual ?>"
+
+                                                            class="input-color"
+                                                        >
 
 
-                        <?php endif; ?>
+                                                    </td>
+
+                                                </tr>
+
+
+                                            <?php endforeach; ?>
+
+
+                                            </tbody>
+
+                                        </table>
+
+                                    </div>
+
+
+                                    <!-- ==================================
+                                         BOTÓN GUARDAR
+                                    =================================== -->
+
+                                    <div
+                                        class="text-end mt-3"
+                                    >
+
+                                        <button
+                                            type="submit"
+                                            class="btn btn-success"
+                                        >
+
+                                            💾 Guardar seguimiento
+
+                                        </button>
+
+                                    </div>
+
+
+                                </form>
+
+
+                            <?php else: ?>
+
+
+                                <div
+                                    class="alert
+                                           alert-info
+                                           mb-0"
+                                >
+
+                                    No hay estudiantes activos
+                                    registrados en este curso.
+
+                                </div>
+
+
+                            <?php endif; ?>
+
+
+                        </div>
 
                     </div>
 
-                </div>
+
+                <?php endif; ?>
 
 
             </div>
@@ -1048,9 +1222,109 @@ include("../../includes/navbar.php");
 </div>
 
 
-<?php
+<script>
 
-$stmt->close();
+/* ======================================================
+   SEMÁFORO DE DESEMPEÑO
+====================================================== */
+
+document.addEventListener(
+    "DOMContentLoaded",
+    function () {
+
+
+        const botones =
+            document.querySelectorAll(
+                ".btn-desempeno"
+            );
+
+
+        botones.forEach(
+            function (boton) {
+
+
+                boton.addEventListener(
+                    "click",
+                    function () {
+
+
+                        const fila =
+                            boton.closest("tr");
+
+
+                        if (!fila) {
+
+                            return;
+
+                        }
+
+
+                        // ----------------------------------
+                        // QUITAR SELECCIÓN ANTERIOR
+                        // ----------------------------------
+
+                        fila
+                            .querySelectorAll(
+                                ".btn-desempeno"
+                            )
+                            .forEach(
+                                function (btn) {
+
+                                    btn.classList.remove(
+                                        "seleccionado"
+                                    );
+
+                                }
+                            );
+
+
+                        // ----------------------------------
+                        // SELECCIONAR BOTÓN ACTUAL
+                        // ----------------------------------
+
+                        boton.classList.add(
+                            "seleccionado"
+                        );
+
+
+                        // ----------------------------------
+                        // OBTENER COLOR
+                        // ----------------------------------
+
+                        const color =
+                            boton.dataset.color;
+
+
+                        // ----------------------------------
+                        // ACTUALIZAR INPUT
+                        // ----------------------------------
+
+                        const input =
+                            fila.querySelector(
+                                ".input-color"
+                            );
+
+
+                        if (input) {
+
+                            input.value =
+                                color;
+
+                        }
+
+                    }
+                );
+
+            }
+        );
+
+    }
+);
+
+</script>
+
+
+<?php
 
 include("../../includes/footer.php");
 
