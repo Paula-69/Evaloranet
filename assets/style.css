@@ -793,193 +793,180 @@ footer {
 ====================================================== */
 
 .btn-desempeno {
-
     display: inline-flex;
-
     align-items: center;
-
     justify-content: center;
+    gap: 7px;
 
-    gap: 6px;
-
-    min-width: 105px;
-
+    min-width: 95px;
     margin: 2px;
 
-    /* Sin seleccionar: cuadro blanco */
     background-color: #ffffff !important;
-
-    transition:
-        background-color 0.2s ease,
-        color 0.2s ease,
-        border-color 0.2s ease,
-        transform 0.15s ease;
+    transition: all 0.2s ease;
 }
 
 
 /* ======================================================
-   CÍRCULO DEL SEMÁFORO
+   CÍRCULO NORMAL
 ====================================================== */
 
 .circulo-semaforo {
-
     width: 18px;
-
     height: 18px;
 
     border-radius: 50%;
 
     display: inline-block;
 
-    /* Círculo vacío */
-    background-color: #ffffff;
+    background-color: transparent;
 
-    /* El borde toma el color del desempeño */
     border: 2px solid currentColor;
-
-    transition:
-        background-color 0.2s ease,
-        border-color 0.2s ease,
-        transform 0.15s ease;
 }
 
 
 /* ======================================================
-   COLORES
+   COLORES NORMALES
 ====================================================== */
 
 .btn-bajo {
-
     color: #dc3545 !important;
-
     border-color: #dc3545 !important;
 }
 
-
 .btn-basico {
-
     color: #ffc107 !important;
-
     border-color: #ffc107 !important;
 }
 
-
 .btn-alto {
-
     color: #198754 !important;
-
     border-color: #198754 !important;
 }
 
 
 /* ======================================================
    BAJO SELECCIONADO
-   CUADRO + CÍRCULO ROJO
+   TODO EL CUADRO ROJO
 ====================================================== */
 
 .btn-bajo.seleccionado {
-
     background-color: #dc3545 !important;
-
     border-color: #dc3545 !important;
-
     color: #ffffff !important;
 }
 
-
-.btn-bajo.seleccionado
-.circulo-semaforo {
-
-    background-color: #dc3545;
-
-    border-color: #ffffff;
-
-    transform: scale(1.05);
+.btn-bajo.seleccionado .circulo-semaforo {
+    background-color: #dc3545 !important;
+    border-color: #ffffff !important;
 }
 
 
 /* ======================================================
    BÁSICO SELECCIONADO
-   CUADRO + CÍRCULO AMARILLO
+   TODO EL CUADRO AMARILLO
 ====================================================== */
 
 .btn-basico.seleccionado {
-
     background-color: #ffc107 !important;
-
     border-color: #ffc107 !important;
-
     color: #212529 !important;
 }
 
-
-.btn-basico.seleccionado
-.circulo-semaforo {
-
-    background-color: #ffc107;
-
-    border-color: #212529;
-
-    transform: scale(1.05);
+.btn-basico.seleccionado .circulo-semaforo {
+    background-color: #ffc107 !important;
+    border-color: #212529 !important;
 }
 
 
 /* ======================================================
    ALTO SELECCIONADO
-   CUADRO + CÍRCULO VERDE
+   TODO EL CUADRO VERDE
 ====================================================== */
 
 .btn-alto.seleccionado {
-
     background-color: #198754 !important;
-
     border-color: #198754 !important;
-
     color: #ffffff !important;
 }
 
-
-.btn-alto.seleccionado
-.circulo-semaforo {
-
-    background-color: #198754;
-
-    border-color: #ffffff;
-
-    transform: scale(1.05);
+.btn-alto.seleccionado .circulo-semaforo {
+    background-color: #198754 !important;
+    border-color: #ffffff !important;
 }
 
 
 /* ======================================================
-   EFECTO AL PASAR EL MOUSE
+   MANTENER COLOR AL HACER HOVER
 ====================================================== */
 
-.btn-desempeno:hover {
+.btn-bajo.seleccionado:hover,
+.btn-bajo.seleccionado:focus {
+    background-color: #dc3545 !important;
+    border-color: #dc3545 !important;
+    color: #ffffff !important;
+}
 
-    transform: translateY(-1px);
+.btn-basico.seleccionado:hover,
+.btn-basico.seleccionado:focus {
+    background-color: #ffc107 !important;
+    border-color: #ffc107 !important;
+    color: #212529 !important;
+}
+
+.btn-alto.seleccionado:hover,
+.btn-alto.seleccionado:focus {
+    background-color: #198754 !important;
+    border-color: #198754 !important;
+    color: #ffffff !important;
+}
+/* ======================================================
+   RELLENO COMPLETO DEL BOTÓN SELECCIONADO
+====================================================== */
+
+button.btn-desempeno.seleccionado.btn-bajo {
+    background: #dc3545 !important;
+    background-color: #dc3545 !important;
+    color: #ffffff !important;
+    border: 2px solid #dc3545 !important;
+}
+
+button.btn-desempeno.seleccionado.btn-basico {
+    background: #ffc107 !important;
+    background-color: #ffc107 !important;
+    color: #212529 !important;
+    border: 2px solid #ffc107 !important;
+}
+
+button.btn-desempeno.seleccionado.btn-alto {
+    background: #198754 !important;
+    background-color: #198754 !important;
+    color: #ffffff !important;
+    border: 2px solid #198754 !important;
 }
 
 
-/* ======================================================
-   MANTENER COLOR AL PASAR EL MOUSE
-====================================================== */
+/* Mantener el relleno al pasar el mouse */
 
-.btn-bajo.seleccionado:hover {
-
+button.btn-desempeno.seleccionado.btn-bajo:hover,
+button.btn-desempeno.seleccionado.btn-bajo:focus,
+button.btn-desempeno.seleccionado.btn-bajo:active {
+    background: #dc3545 !important;
     background-color: #dc3545 !important;
     color: #ffffff !important;
 }
 
-
-.btn-basico.seleccionado:hover {
-
+button.btn-desempeno.seleccionado.btn-basico:hover,
+button.btn-desempeno.seleccionado.btn-basico:focus,
+button.btn-desempeno.seleccionado.btn-basico:active {
+    background: #ffc107 !important;
     background-color: #ffc107 !important;
     color: #212529 !important;
 }
 
-
-.btn-alto.seleccionado:hover {
-
+button.btn-desempeno.seleccionado.btn-alto:hover,
+button.btn-desempeno.seleccionado.btn-alto:focus,
+button.btn-desempeno.seleccionado.btn-alto:active {
+    background: #198754 !important;
     background-color: #198754 !important;
     color: #ffffff !important;
-} 
+}

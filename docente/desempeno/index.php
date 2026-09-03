@@ -27,7 +27,7 @@ $carga_id = (int) $_GET["id"];
 // OBTENER DOCENTE
 // ======================================================
 
-$usuario_id = $_SESSION["id"] ?? 0;
+$usuario_id = intval($_SESSION["id"] ?? 0);
 
 if ($usuario_id <= 0) {
 
@@ -44,11 +44,7 @@ $stmt = $conexion->prepare("
     LIMIT 1
 ");
 
-$stmt->bind_param(
-    "i",
-    $usuario_id
-);
-
+$stmt->bind_param("i", $usuario_id);
 $stmt->execute();
 
 $resultado = $stmt->get_result();
@@ -65,7 +61,7 @@ if ($resultado->num_rows === 0) {
 
 $docente = $resultado->fetch_assoc();
 
-$docente_id = (int) $docente["id"];
+$docente_id = intval($docente["id"]);
 
 $stmt->close();
 
@@ -80,7 +76,6 @@ $stmt = $conexion->prepare("
         ca.docente_id,
         ca.curso_id,
         ca.materia_id,
-
         c.nombre AS curso,
         m.nombre AS materia
 
@@ -132,16 +127,16 @@ $stmt->close();
 
 
 // ======================================================
-// PERÍODO
+// PERÍODO SELECCIONADO
 // ======================================================
 
 $periodo_id = isset($_GET["periodo_id"])
-    ? (int) $_GET["periodo_id"]
+    ? intval($_GET["periodo_id"])
     : 0;
 
 
 // ======================================================
-// OBTENER PERÍODOS
+// OBTENER TODOS LOS PERÍODOS
 // ======================================================
 
 $periodos = [];
@@ -170,8 +165,8 @@ if ($resultadoPeriodos) {
 
 
 // ======================================================
-// SI NO HAY PERÍODO SELECCIONADO
-// BUSCAR UNO HABILITADO
+// SI NO HAY PERÍODO,
+// BUSCAR EL PRIMER PERÍODO HABILITADO
 // ======================================================
 
 if ($periodo_id <= 0) {
@@ -179,11 +174,11 @@ if ($periodo_id <= 0) {
     foreach ($periodos as $periodo) {
 
         if (
-            (int)$periodo["habilitado"] === 1
+            intval($periodo["habilitado"]) === 1
         ) {
 
             $periodo_id =
-                (int)$periodo["id"];
+                intval($periodo["id"]);
 
             break;
 
@@ -240,7 +235,7 @@ if ($periodo_id > 0) {
 
 
         if (
-            (int)$periodo_actual["habilitado"] !== 1
+            intval($periodo_actual["habilitado"]) !== 1
         ) {
 
             $periodo_bloqueado = true;
@@ -305,7 +300,8 @@ while (
     $estudiante = $resultado->fetch_assoc()
 ) {
 
-    $estudiantes[] = $estudiante;
+    $estudiantes[] =
+        $estudiante;
 
 }
 
@@ -318,50 +314,58 @@ $stmt->close();
 
 $desempenos = [];
 
-$stmt = $conexion->prepare("
-    SELECT
-        estudiante_id,
-        color_id
+if ($periodo_id > 0) {
 
-    FROM desempeno_estudiantes
+    $stmt = $conexion->prepare("
+        SELECT
+            estudiante_id,
+            color_id
 
-    WHERE carga_academica_id = ?
-    AND periodo_id = ?
-");
+        FROM desempeno_estudiantes
 
-
-if ($stmt) {
-
-    $stmt->bind_param(
-        "ii",
-        $carga_id,
-        $periodo_id
-    );
-
-    $stmt->execute();
-
-    $resultado =
-        $stmt->get_result();
+        WHERE carga_academica_id = ?
+        AND periodo_id = ?
+    ");
 
 
-    while (
-        $fila = $resultado->fetch_assoc()
-    ) {
+    if ($stmt) {
 
-        $desempenos[
-            (int)$fila["estudiante_id"]
-        ] =
-            (int)$fila["color_id"];
+        $stmt->bind_param(
+            "ii",
+            $carga_id,
+            $periodo_id
+        );
+
+        $stmt->execute();
+
+        $resultado =
+            $stmt->get_result();
+
+
+        while (
+            $fila = $resultado->fetch_assoc()
+        ) {
+
+            $desempenos[
+                intval(
+                    $fila["estudiante_id"]
+                )
+            ] =
+                intval(
+                    $fila["color_id"]
+                );
+
+        }
+
+        $stmt->close();
 
     }
-
-    $stmt->close();
 
 }
 
 
 // ======================================================
-// CABECERA
+// HEADER
 // ======================================================
 
 include("../../includes/header.php");
@@ -369,101 +373,6 @@ include("../../includes/header.php");
 include("../../includes/navbar.php");
 
 ?>
-
-
-<style>
-
-/* ======================================================
-   BOTONES DE DESEMPEÑO
-====================================================== */
-
-.btn-desempeno {
-
-    display: inline-flex;
-
-    align-items: center;
-
-    justify-content: center;
-
-    gap: 6px;
-
-    min-width: 95px;
-
-    margin: 2px;
-
-}
-
-
-/* ======================================================
-   CÍRCULO
-====================================================== */
-
-.circulo-semaforo {
-
-    width: 18px;
-
-    height: 18px;
-
-    border-radius: 50%;
-
-    display: inline-block;
-
-    background-color: white;
-
-    border: 2px solid currentColor;
-
-    transition:
-        background-color .2s ease,
-        transform .15s ease;
-
-}
-
-
-/* ======================================================
-   CÍRCULO SELECCIONADO
-====================================================== */
-
-.btn-desempeno.seleccionado
-.circulo-semaforo {
-
-    background-color: currentColor;
-
-    transform: scale(1.05);
-
-}
-
-
-/* ======================================================
-   COLORES
-====================================================== */
-
-.btn-bajo {
-
-    color: #dc3545;
-
-    border-color: #dc3545;
-
-}
-
-
-.btn-basico {
-
-    color: #ffc107;
-
-    border-color: #ffc107;
-
-}
-
-
-.btn-alto {
-
-    color: #198754;
-
-    border-color: #198754;
-
-}
-
-</style>
 
 
 <div class="container-fluid">
@@ -500,8 +409,10 @@ include("../../includes/navbar.php");
                 =================================================== -->
 
                 <div
-                    class="d-flex justify-content-between
-                           align-items-center mb-4"
+                    class="d-flex
+                           justify-content-between
+                           align-items-center
+                           mb-4"
                 >
 
                     <div>
@@ -556,7 +467,7 @@ include("../../includes/navbar.php");
 
 
                 <!-- ==================================================
-                     MENSAJE DE ERROR
+                     ERROR
                 =================================================== -->
 
                 <?php if (
@@ -575,7 +486,7 @@ include("../../includes/navbar.php");
 
 
                 <!-- ==================================================
-                     MENSAJE DE ÉXITO
+                     ÉXITO
                 =================================================== -->
 
                 <?php if (
@@ -596,7 +507,7 @@ include("../../includes/navbar.php");
 
 
                 <!-- ==================================================
-                     PERÍODO ACADÉMICO
+                     PERÍODO
                 =================================================== -->
 
                 <div class="card shadow mb-4">
@@ -627,9 +538,9 @@ include("../../includes/navbar.php");
                                 function ($periodo) {
 
                                     return
-                                        (int)$periodo[
-                                            "habilitado"
-                                        ] === 1;
+                                        intval(
+                                            $periodo["habilitado"]
+                                        ) === 1;
 
                                 }
                             );
@@ -684,41 +595,43 @@ include("../../includes/navbar.php");
                                             required
                                         >
 
-                                            <?php
-
-                                            foreach (
+                                            <?php foreach (
                                                 $periodos_habilitados
                                                 as $periodo
-                                            ):
+                                            ): ?>
+
+
+                                                <?php
 
                                                 $idPeriodo =
-                                                    (int)$periodo[
-                                                        "id"
-                                                    ];
+                                                    intval(
+                                                        $periodo["id"]
+                                                    );
 
-                                            ?>
+                                                ?>
+
 
                                                 <option
                                                     value="<?= $idPeriodo ?>"
 
-                                                    <?= (
-                                                        $idPeriodo ===
-                                                        $periodo_id
-                                                    )
-                                                        ? "selected"
-                                                        : ""
+                                                    <?=
+                                                        (
+                                                            $idPeriodo ===
+                                                            $periodo_id
+                                                        )
+                                                            ? "selected"
+                                                            : ""
                                                     ?>
                                                 >
 
                                                     <?= htmlspecialchars(
-                                                        $periodo[
-                                                            "nombre"
-                                                        ]
+                                                        $periodo["nombre"]
                                                     ) ?>
 
                                                     — 🟢 Habilitado
 
                                                 </option>
+
 
                                             <?php endforeach; ?>
 
@@ -787,9 +700,7 @@ include("../../includes/navbar.php");
                                 <strong>
 
                                     <?= htmlspecialchars(
-                                        $periodo_actual[
-                                            "nombre"
-                                        ]
+                                        $periodo_actual["nombre"]
                                     ) ?>
 
                                 </strong>
@@ -866,9 +777,7 @@ include("../../includes/navbar.php");
                                 Seguimiento de estudiantes -
 
                                 <?= htmlspecialchars(
-                                    $periodo_actual[
-                                        "nombre"
-                                    ]
+                                    $periodo_actual["nombre"]
                                 ) ?>
 
                             </h5>
@@ -893,14 +802,18 @@ include("../../includes/navbar.php");
                                     <input
                                         type="hidden"
                                         name="curso_id"
-                                        value="<?= (int)$carga["curso_id"] ?>"
+                                        value="<?= intval(
+                                            $carga["curso_id"]
+                                        ) ?>"
                                     >
 
 
                                     <input
                                         type="hidden"
                                         name="materia_id"
-                                        value="<?= (int)$carga["materia_id"] ?>"
+                                        value="<?= intval(
+                                            $carga["materia_id"]
+                                        ) ?>"
                                     >
 
 
@@ -915,18 +828,14 @@ include("../../includes/navbar.php");
                                         class="table-responsive"
                                     >
 
-
                                         <table
                                             class="table
                                                    table-bordered
-                                                   table-hover
+                                                   table-striped
                                                    align-middle"
                                         >
 
-
-                                            <thead
-                                                class="table-light"
-                                            >
+                                            <thead>
 
                                                 <tr>
 
@@ -967,9 +876,9 @@ include("../../includes/navbar.php");
                                             ):
 
                                                 $estudiante_id =
-                                                    (int)$estudiante[
-                                                        "id"
-                                                    ];
+                                                    intval(
+                                                        $estudiante["id"]
+                                                    );
 
 
                                                 $color_actual =
@@ -1045,8 +954,8 @@ include("../../includes/navbar.php");
                                                                 <?= (
                                                                     $color_actual === 1
                                                                 )
-                                                                    ? 'seleccionado'
-                                                                    : ''
+                                                                    ? "seleccionado"
+                                                                    : ""
                                                                 ?>
                                                             "
 
@@ -1080,8 +989,8 @@ include("../../includes/navbar.php");
                                                                 <?= (
                                                                     $color_actual === 2
                                                                 )
-                                                                    ? 'seleccionado'
-                                                                    : ''
+                                                                    ? "seleccionado"
+                                                                    : ""
                                                                 ?>
                                                             "
 
@@ -1115,8 +1024,8 @@ include("../../includes/navbar.php");
                                                                 <?= (
                                                                     $color_actual === 3
                                                                 )
-                                                                    ? 'seleccionado'
-                                                                    : ''
+                                                                    ? "seleccionado"
+                                                                    : ""
                                                                 ?>
                                                             "
 
@@ -1135,8 +1044,8 @@ include("../../includes/navbar.php");
 
 
                                                         <!-- ==================================
-                                                             VALOR PARA GUARDAR
-                                                        =================================== -->
+                                                             INPUT OCULTO
+                                                        ================================== -->
 
                                                         <input
                                                             type="hidden"
@@ -1165,7 +1074,7 @@ include("../../includes/navbar.php");
 
 
                                     <!-- ==================================
-                                         BOTÓN GUARDAR
+                                         GUARDAR
                                     =================================== -->
 
                                     <div
@@ -1224,10 +1133,6 @@ include("../../includes/navbar.php");
 
 <script>
 
-/* ======================================================
-   SEMÁFORO DE DESEMPEÑO
-====================================================== */
-
 document.addEventListener(
     "DOMContentLoaded",
     function () {
@@ -1238,6 +1143,213 @@ document.addEventListener(
                 ".btn-desempeno"
             );
 
+
+        // ==================================================
+        // APLICAR COLOR AL BOTÓN
+        // ==================================================
+
+        function aplicarColor(boton) {
+
+
+            const color =
+                boton.dataset.color;
+
+
+            // ----------------------------------------------
+            // BAJO
+            // ----------------------------------------------
+
+            if (color === "1") {
+
+                boton.style.setProperty(
+                    "background-color",
+                    "#dc3545",
+                    "important"
+                );
+
+                boton.style.setProperty(
+                    "border-color",
+                    "#dc3545",
+                    "important"
+                );
+
+                boton.style.setProperty(
+                    "color",
+                    "#ffffff",
+                    "important"
+                );
+
+            }
+
+
+            // ----------------------------------------------
+            // BÁSICO
+            // ----------------------------------------------
+
+            if (color === "2") {
+
+                boton.style.setProperty(
+                    "background-color",
+                    "#ffc107",
+                    "important"
+                );
+
+                boton.style.setProperty(
+                    "border-color",
+                    "#ffc107",
+                    "important"
+                );
+
+                boton.style.setProperty(
+                    "color",
+                    "#212529",
+                    "important"
+                );
+
+            }
+
+
+            // ----------------------------------------------
+            // ALTO
+            // ----------------------------------------------
+
+            if (color === "3") {
+
+                boton.style.setProperty(
+                    "background-color",
+                    "#198754",
+                    "important"
+                );
+
+                boton.style.setProperty(
+                    "border-color",
+                    "#198754",
+                    "important"
+                );
+
+                boton.style.setProperty(
+                    "color",
+                    "#ffffff",
+                    "important"
+                );
+
+            }
+
+
+            // ==================================================
+            // CÍRCULO
+            // ==================================================
+
+            const circulo =
+                boton.querySelector(
+                    ".circulo-semaforo"
+                );
+
+
+            if (!circulo) {
+
+                return;
+
+            }
+
+
+            if (color === "1") {
+
+                circulo.style.setProperty(
+                    "background-color",
+                    "#dc3545",
+                    "important"
+                );
+
+                circulo.style.setProperty(
+                    "border-color",
+                    "#ffffff",
+                    "important"
+                );
+
+            }
+
+
+            if (color === "2") {
+
+                circulo.style.setProperty(
+                    "background-color",
+                    "#ffc107",
+                    "important"
+                );
+
+                circulo.style.setProperty(
+                    "border-color",
+                    "#212529",
+                    "important"
+                );
+
+            }
+
+
+            if (color === "3") {
+
+                circulo.style.setProperty(
+                    "background-color",
+                    "#198754",
+                    "important"
+                );
+
+                circulo.style.setProperty(
+                    "border-color",
+                    "#ffffff",
+                    "important"
+                );
+
+            }
+
+        }
+
+
+        // ==================================================
+        // QUITAR COLOR
+        // ==================================================
+
+        function quitarColor(boton) {
+
+
+            boton.style.removeProperty(
+                "background-color"
+            );
+
+            boton.style.removeProperty(
+                "border-color"
+            );
+
+            boton.style.removeProperty(
+                "color"
+            );
+
+
+            const circulo =
+                boton.querySelector(
+                    ".circulo-semaforo"
+                );
+
+
+            if (circulo) {
+
+                circulo.style.removeProperty(
+                    "background-color"
+                );
+
+                circulo.style.removeProperty(
+                    "border-color"
+                );
+
+            }
+
+        }
+
+
+        // ==================================================
+        // CLIC EN DESEMPEÑO
+        // ==================================================
 
         botones.forEach(
             function (boton) {
@@ -1260,26 +1372,30 @@ document.addEventListener(
 
 
                         // ----------------------------------
-                        // QUITAR SELECCIÓN ANTERIOR
+                        // QUITAR ANTERIOR
                         // ----------------------------------
 
-                        fila
-                            .querySelectorAll(
+                        const botonesFila =
+                            fila.querySelectorAll(
                                 ".btn-desempeno"
-                            )
-                            .forEach(
-                                function (btn) {
-
-                                    btn.classList.remove(
-                                        "seleccionado"
-                                    );
-
-                                }
                             );
 
 
+                        botonesFila.forEach(
+                            function (btn) {
+
+                                btn.classList.remove(
+                                    "seleccionado"
+                                );
+
+                                quitarColor(btn);
+
+                            }
+                        );
+
+
                         // ----------------------------------
-                        // SELECCIONAR BOTÓN ACTUAL
+                        // SELECCIONAR ACTUAL
                         // ----------------------------------
 
                         boton.classList.add(
@@ -1288,11 +1404,12 @@ document.addEventListener(
 
 
                         // ----------------------------------
-                        // OBTENER COLOR
+                        // PINTAR BOTÓN Y CÍRCULO
                         // ----------------------------------
 
-                        const color =
-                            boton.dataset.color;
+                        aplicarColor(
+                            boton
+                        );
 
 
                         // ----------------------------------
@@ -1308,12 +1425,29 @@ document.addEventListener(
                         if (input) {
 
                             input.value =
-                                color;
+                                boton.dataset.color;
 
                         }
 
                     }
                 );
+
+
+                // ==================================================
+                // PINTAR DESEMPEÑO YA GUARDADO
+                // ==================================================
+
+                if (
+                    boton.classList.contains(
+                        "seleccionado"
+                    )
+                ) {
+
+                    aplicarColor(
+                        boton
+                    );
+
+                }
 
             }
         );
