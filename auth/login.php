@@ -1,78 +1,183 @@
+
 <?php
+require_once __DIR__ . '/../config/config.php';
 
-require_once("../config/config.php");
+/* Redirigir si el usuario ya inició sesión */
+if (isset($_SESSION['usuario_id'], $_SESSION['rol'])) {
+    $rol = strtolower(trim((string) $_SESSION['rol']));
 
-if(isset($_SESSION["id"])){
-    header("Location: ../".$_SESSION["rol"]."/index.php");
-    exit();
+    $rutas = [
+        'administrador' => '../admin/index.php',
+        'admin'         => '../admin/index.php',
+        'coordinador'   => '../coordinador/index.php',
+        'docente'       => '../docente/index.php',
+        'estudiante'    => '../estudiante/index.php',
+    ];
+
+    if (isset($rutas[$rol])) {
+        header('Location: ' . $rutas[$rol]);
+        exit;
+    }
 }
 
-include("../includes/header.php");
-
+require_once __DIR__ . '/../includes/header.php';
 ?>
 
-<div class="container mt-5">
+<main class="login-shell">
 
-<div class="row justify-content-center">
+    <!-- Fondo decorativo -->
+    <div class="login-decoration login-decoration-one" aria-hidden="true"></div>
+    <div class="login-decoration login-decoration-two" aria-hidden="true"></div>
 
-<div class="col-md-5">
+    <!-- Presentación izquierda -->
+    <section class="login-welcome">
+        <div class="login-welcome-content">
 
-<div class="card shadow">
+            <div class="login-tag">
+                <span aria-hidden="true">🎓</span>
+                SISTEMA DE SEGUIMIENTO ACADÉMICO
+            </div>
 
-<div class="card-header bg-primary text-white text-center">
+            <h1>
+                Bienvenido a
+                <span class="login-title-accent">EvaloraNet</span>
+            </h1>
 
-<h3>Seguimiento Académico</h3>
+            <div class="login-yellow-line"></div>
 
-</div>
+            <p class="login-description">
+                Un espacio diseñado para acompañar, organizar y fortalecer
+                el proceso académico de nuestra comunidad educativa.
+            </p>
 
-<div class="card-body">
+            <div class="login-motivation">
+                <div class="login-motivation-icon" aria-hidden="true">📊</div>
 
-<form action="validar_login.php" method="POST">
+                <div class="login-motivation-text">
+                    <strong>Conéctate con algo seguro</strong>
+                    <span>para lograr un triunfo.</span>
+                </div>
+            </div>
 
-<div class="mb-3">
+        </div>
+    </section>
 
-<label>Número de documento</label>
+    <!-- Elementos flotantes decorativos -->
+    <div class="login-floating login-floating-book" aria-hidden="true">
+        📚
+    </div>
 
-<input
-type="text"
-name="documento"
-class="form-control"
-required>
+    <div class="login-floating login-floating-graduate" aria-hidden="true">
+        🎓
+    </div>
 
-</div>
+    <div class="login-floating login-floating-chart" aria-hidden="true">
+        📊
+    </div>
 
-<div class="mb-3">
+    <!-- Formulario de acceso -->
+    <section class="login-panel">
+        <div class="login-card">
 
-<label>Contraseña</label>
+            <div class="login-brand">
+                <div class="login-brand-icon" aria-hidden="true">📚</div>
 
-<input
-type="password"
-name="password"
-class="form-control"
-required>
+                <div class="login-brand-copy">
+                    <span class="login-brand-name">
+                        EVALORA<span>NET</span>
+                    </span>
 
-</div>
+                    <small>Seguimiento Académico</small>
+                </div>
+            </div>
 
-<button class="btn btn-primary w-100">
+            <h2>Iniciar sesión</h2>
 
-Ingresar
+            <p class="login-subtitle">
+                Ingresa tus datos para continuar.
+            </p>
 
-</button>
+            <?php if (!empty($_SESSION['mensaje_error'])): ?>
+                <div class="alert alert-danger" role="alert">
+                    <?= htmlspecialchars(
+                        (string) $_SESSION['mensaje_error'],
+                        ENT_QUOTES,
+                        'UTF-8'
+                    ) ?>
+                </div>
+                <?php unset($_SESSION['mensaje_error']); ?>
+            <?php endif; ?>
 
-</form>
+            <?php if (!empty($_SESSION['mensaje_exito'])): ?>
+                <div class="alert alert-success" role="alert">
+                    <?= htmlspecialchars(
+                        (string) $_SESSION['mensaje_exito'],
+                        ENT_QUOTES,
+                        'UTF-8'
+                    ) ?>
+                </div>
+                <?php unset($_SESSION['mensaje_exito']); ?>
+            <?php endif; ?>
 
-</div>
+            <form action="validar_login.php" method="POST">
 
-</div>
+                <div class="login-form-group">
+                    <label for="usuario" class="form-label">
+                        Usuario o correo electrónico
+                    </label>
 
-</div>
+                    <div class="login-input-wrap">
+                        <span class="login-input-icon" aria-hidden="true">♙</span>
 
-</div>
+                        <input
+                            type="text"
+                            id="usuario"
+                            name="usuario"
+                            class="form-control"
+                            placeholder="Ingresa tu usuario"
+                            autocomplete="username"
+                            required
+                            autofocus
+                        >
+                    </div>
+                </div>
 
-</div>
+                <div class="login-form-group">
+                    <label for="contrasena" class="form-label">
+                        Contraseña
+                    </label>
 
-<?php
+                    <div class="login-input-wrap">
+                        <span class="login-input-icon" aria-hidden="true">🔒</span>
 
-include("../includes/footer.php");
+                        <input
+                            type="password"
+                            id="contrasena"
+                            name="contrasena"
+                            class="form-control"
+                            placeholder="Ingresa tu contraseña"
+                            autocomplete="current-password"
+                            required
+                        >
+                    </div>
+                </div>
 
-?>
+                <button type="submit" class="login-submit">
+                    <span>Iniciar sesión</span>
+                    <span class="login-submit-arrow" aria-hidden="true">⟶</span>
+                </button>
+
+            </form>
+
+            <div class="login-footer">
+                <span aria-hidden="true">🔒</span>
+                Tu información se maneja de forma segura.
+            </div>
+
+        </div>
+    </section>
+
+</main>
+
+<?php require_once __DIR__ . '/../includes/footer.php'; ?>
+```

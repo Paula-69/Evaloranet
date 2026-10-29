@@ -1,104 +1,128 @@
-<?php
 
+<?php
 session_start();
 
-require_once("../config/config.php");
+require_once __DIR__ . '/../config/config.php';
 
-if ($_SERVER["REQUEST_METHOD"] !== "POST") {
-    header("Location: login.php");
-    exit();
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    header('Location: login.php');
+    exit;
 }
 
-$documento = trim($_POST["documento"] ?? '');
-$password = trim($_POST["password"] ?? '');
+/*
+|--------------------------------------------------------------------------
+| Recibir los datos del formulario
+|--------------------------------------------------------------------------
+| login.php envía "usuario" y "contrasena".
+| Permitimos iniciar sesión usando el número de documento o el correo.
+*/
 
-if ($documento === '' || $password === '') {
-    header("Location: login.php?error=1");
-    exit();
+$usuarioIngresado = trim($_POST['usuario'] ?? '');
+$passwordIngresada = $_POST['contrasena'] ?? '';
+
+if ($usuarioIngresado === '' || $passwordIngresada === '') {
+    header('Location: login.php?error=1');
+    exit;
 }
 
-$sql = "SELECT * FROM usuarios
-        WHERE documento = ?
-        AND activo = 1
+/*
+|--------------------------------------------------------------------------
+| Buscar usuario activo por documento o correo
+|--------------------------------------------------------------------------
+*/
+
+$sql = "SELECT *
+        FROM usuarios
+        WHERE (documento = ? OR correo = ?)
+          AND activo = 1
         LIMIT 1";
 
 $stmt = $conexion->prepare($sql);
 
 if (!$stmt) {
-    die("Error en la consulta: " . $conexion->error);
+    error_log('Error preparando login: ' . $conexion->error);
+    header('Location: login.php?error=1');
+    exit;
 }
 
-$stmt->bind_param("s", $documento);
+$stmt->bind_param(
+    'ss',
+    $usuarioIngresado,
+    $usuarioIngresado
+);
 
 $stmt->execute();
-
 $resultado = $stmt->get_result();
 
 if ($resultado->num_rows !== 1) {
-    header("Location: login.php?error=1");
-    exit();
+    $stmt->close();
+    header('Location: login.php?error=1');
+    exit;
 }
 
 $usuario = $resultado->fetch_assoc();
+$stmt->close();
 
-if (!password_verify($password, $usuario["password"])) {
-    header("Location: login.php?error=1");
-    exit();
+/*
+|--------------------------------------------------------------------------
+| Verificar contraseña
+|--------------------------------------------------------------------------
+*/
+
+if (!password_verify($passwordIngresada, $usuario['password'])) {
+    header('Location: login.php?error=1');
+    exit;
 }
 
 /*
 |--------------------------------------------------------------------------
-| GUARDAR SESIÓN
+| Crear sesión
 |--------------------------------------------------------------------------
 */
 
-$_SESSION["id"] = $usuario["id"];
-$_SESSION["nombre"] = $usuario["nombres"];
-$_SESSION["rol"] = $usuario["rol"];
+session_regenerate_id(true);
+
+$_SESSION['id'] = (int) $usuario['id'];
+$_SESSION['usuario_id'] = (int) $usuario['id'];
+$_SESSION['nombre'] = $usuario['nombres'];
+$_SESSION['rol'] = strtolower(trim($usuario['rol']));
 
 /*
 |--------------------------------------------------------------------------
-| CAMBIO DE CONTRASEÑA
+| Forzar cambio de contraseña
 |--------------------------------------------------------------------------
 */
 
 if (
-    ($usuario["rol"] === "coordinador" ||
-     $usuario["rol"] === "docente")
-    &&
-    (int)$usuario["cambiar_password"] === 1
+    in_array($_SESSION['rol'], ['coordinador', 'docente'], true)
+    && (int) $usuario['cambiar_password'] === 1
 ) {
-
-    header("Location: ../cambiar_password.php");
-    exit();
+    header('Location: ../cambiar_password.php');
+    exit;
 }
 
 /*
 |--------------------------------------------------------------------------
-| REDIRECCIÓN SEGÚN ROL
+| Redirigir según el rol
 |--------------------------------------------------------------------------
 */
 
-if ($usuario["rol"] === "coordinador") {
+$rutas = [
+    'administrador' => '../admin/index.php',
+    'admin'         => '../admin/index.php',
+    'coordinador'   => '../coordinador/index.php',
+    'docente'       => '../docente/index.php',
+    'estudiante'    => '../estudiante/index.php',
+];
 
-    header("Location: ../coordinador/index.php");
-    exit();
-
+if (isset($rutas[$_SESSION['rol']])) {
+    header('Location: ' . $rutas[$_SESSION['rol']]);
+    exit;
 }
 
-if ($usuario["rol"] === "docente") {
+session_unset();
+session_destroy();
 
-    header("Location: ../docente/index.php");
-    exit();
+header('Location: login.php?error=1');
+exit;
 
-}
-
-if ($usuario["rol"] === "estudiante") {
-
-    header("Location: ../estudiante/index.php");
-    exit();
-
-}
-
-header("Location: login.php?error=1");
-exit();

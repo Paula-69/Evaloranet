@@ -1,349 +1,403 @@
+
 <?php
 
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 require_once("../../config/config.php");
 require_once("../../config/seguridad/coordinador.php");
+
+$mensaje = "";
+$tipoMensaje = "";
+
+// ================================================
+// REGISTRAR MATERIA SIN DUPLICADOS
+// ================================================
+
+if ($_SERVER["REQUEST_METHOD"] === "POST") {
+
+    $nombre = trim($_POST["nombre"] ?? "");
+
+    if ($nombre === "") {
+
+        $mensaje = "Debes escribir el nombre de la materia.";
+        $tipoMensaje = "danger";
+
+    } elseif (mb_strlen($nombre, "UTF-8") > 100) {
+
+        $mensaje = "El nombre de la materia no puede superar los 100 caracteres.";
+        $tipoMensaje = "danger";
+
+    } else {
+
+        // Normalizar espacios repetidos entre palabras.
+        $nombre = preg_replace('/\s+/u', ' ', $nombre);
+
+        // Comprobar si la materia ya existe.
+        // LOWER permite comparar sin distinguir mayúsculas y minúsculas.
+        $stmt = $conexion->prepare("
+            SELECT id
+            FROM materias
+            WHERE LOWER(TRIM(nombre)) = LOWER(?)
+            LIMIT 1
+        ");
+
+        if (!$stmt) {
+
+            $mensaje = "No se pudo comprobar si la materia ya existe.";
+            $tipoMensaje = "danger";
+
+        } else {
+
+            $stmt->bind_param("s", $nombre);
+            $stmt->execute();
+
+            $resultadoDuplicado = $stmt->get_result();
+
+            if ($resultadoDuplicado->num_rows > 0) {
+
+                $mensaje = "Esta materia ya está registrada. No puedes ingresarla nuevamente.";
+                $tipoMensaje = "warning";
+
+            } else {
+
+                // Insertar únicamente si no existe.
+                $insertar = $conexion->prepare("
+                    INSERT INTO materias (nombre)
+                    VALUES (?)
+                ");
+
+                if (!$insertar) {
+
+                    $mensaje = "No se pudo preparar el registro de la materia.";
+                    $tipoMensaje = "danger";
+
+                } else {
+
+                    $insertar->bind_param("s", $nombre);
+
+                    if ($insertar->execute()) {
+
+                        $mensaje = "Materia registrada correctamente.";
+                        $tipoMensaje = "success";
+
+                    } else {
+
+                        $mensaje = "No se pudo registrar la materia.";
+                        $tipoMensaje = "danger";
+
+                    }
+
+                    $insertar->close();
+                }
+            }
+
+            $stmt->close();
+        }
+    }
+}
+
+
+// ================================================
+// ELIMINAR MATERIA
+// ================================================
+
+if (isset($_GET["eliminar"]) &&
+    ctype_digit((string) $_GET["eliminar"])) {
+
+    $id = (int) $_GET["eliminar"];
+
+    $stmt = $conexion->prepare("
+        DELETE FROM materias
+        WHERE id = ?
+    ");
+
+    if (!$stmt) {
+
+        $mensaje = "No se pudo preparar la eliminación.";
+        $tipoMensaje = "danger";
+
+    } else {
+
+        $stmt->bind_param("i", $id);
+
+        if ($stmt->execute() && $stmt->affected_rows > 0) {
+
+            $mensaje = "Materia eliminada correctamente.";
+            $tipoMensaje = "success";
+
+        } else {
+
+            $mensaje = "No se pudo eliminar la materia. Puede estar relacionada con una carga académica.";
+            $tipoMensaje = "danger";
+
+        }
+
+        $stmt->close();
+    }
+}
+
+
+// ================================================
+// CONSULTAR MATERIAS REGISTRADAS
+// ================================================
+
+$resultadoMaterias = $conexion->query("
+    SELECT id, nombre
+    FROM materias
+    ORDER BY nombre ASC
+");
+
+
+// ================================================
+// ENCABEZADO Y MENÚ
+// ================================================
 
 include("../../includes/header.php");
 include("../../includes/navbar.php");
 
 ?>
 
-<div class="container-fluid">
+<div class="evalora-layout">
 
-    <div class="row">
+    <?php include("../../includes/sidebar.php"); ?>
 
-        <!-- SIDEBAR -->
+    <main class="evalora-main materias-page">
 
-        <div class="col-md-2 p-0">
+        <div class="materias-contenido">
 
-            <?php include("../../includes/sidebar.php"); ?>
+            <!-- ENCABEZADO -->
 
-        </div>
+            <header class="materias-heading">
 
+                <div class="materias-heading-icon" aria-hidden="true">
+                    ▣
+                </div>
 
-        <!-- CONTENIDO -->
+                <div class="materias-heading-text">
+                    <h1>Administrar materias</h1>
 
-        <div class="col-md-10">
+                    <p>
+                        Registra y consulta las materias utilizadas
+                        en la carga académica.
+                    </p>
+                </div>
 
-            <div class="container mt-4">
+            </header>
 
-                <h2>Administrar materias</h2>
 
-                <p class="text-muted">
+            <!-- MENSAJES -->
 
-                    Aquí puedes registrar y consultar las materias
-                    que serán utilizadas en la carga académica.
+            <?php if ($mensaje !== ""): ?>
 
-                </p>
+                <div
+                    class="alert alert-<?= htmlspecialchars(
+                        $tipoMensaje,
+                        ENT_QUOTES,
+                        "UTF-8"
+                    ) ?> alert-dismissible fade show materias-alert"
+                    role="alert"
+                >
 
-                <hr>
+                    <?= htmlspecialchars(
+                        $mensaje,
+                        ENT_QUOTES,
+                        "UTF-8"
+                    ) ?>
 
+                    <button
+                        type="button"
+                        class="btn-close"
+                        data-bs-dismiss="alert"
+                        aria-label="Cerrar"
+                    ></button>
 
-                <?php
+                </div>
 
-                /*
-                |--------------------------------------------------------------------------
-                | PROCESAR ELIMINACIÓN
-                |--------------------------------------------------------------------------
-                */
+            <?php endif; ?>
 
-                if (
-                    isset($_GET["eliminar"]) &&
-                    is_numeric($_GET["eliminar"])
-                ) {
 
-                    $id = (int) $_GET["eliminar"];
+            <!-- FORMULARIO PARA REGISTRAR MATERIAS -->
 
-                    $sql = "DELETE FROM materias WHERE id = ?";
+            <section class="card materias-card">
 
-                    $stmt = $conexion->prepare($sql);
+                <div class="materias-card-header">
 
-                    $stmt->bind_param("i", $id);
-
-                    if ($stmt->execute()) {
-
-                        echo '<div class="alert alert-success">
-                                Materia eliminada correctamente.
-                              </div>';
-
-                    } else {
-
-                        echo '<div class="alert alert-danger">
-                                No se pudo eliminar la materia.
-                              </div>';
-
-                    }
-
-                    $stmt->close();
-
-                }
-
-
-                /*
-                |--------------------------------------------------------------------------
-                | REGISTRAR MATERIA
-                |--------------------------------------------------------------------------
-                */
-
-                if ($_SERVER["REQUEST_METHOD"] === "POST") {
-
-                    $nombre = trim($_POST["nombre"] ?? "");
-
-                    if ($nombre === "") {
-
-                        echo '<div class="alert alert-danger">
-                                Debes escribir el nombre de la materia.
-                              </div>';
-
-                    } else {
-
-                        $sql = "SELECT id
-                                FROM materias
-                                WHERE nombre = ?
-                                LIMIT 1";
-
-                        $stmt = $conexion->prepare($sql);
-
-                        $stmt->bind_param("s", $nombre);
-
-                        $stmt->execute();
-
-                        $resultado = $stmt->get_result();
-
-
-                        if ($resultado->num_rows > 0) {
-
-                            echo '<div class="alert alert-warning">
-                                    Esta materia ya está registrada.
-                                  </div>';
-
-                        } else {
-
-                            $stmt->close();
-
-
-                            $sql = "INSERT INTO materias (nombre)
-                                    VALUES (?)";
-
-                            $stmt = $conexion->prepare($sql);
-
-                            $stmt->bind_param("s", $nombre);
-
-
-                            if ($stmt->execute()) {
-
-                                echo '<div class="alert alert-success">
-                                        Materia registrada correctamente.
-                                      </div>';
-
-                            } else {
-
-                                echo '<div class="alert alert-danger">
-                                        Error al registrar la materia.
-                                      </div>';
-
-                            }
-
-                        }
-
-                        $stmt->close();
-
-                    }
-
-                }
-
-                ?>
-
-
-                <!-- FORMULARIO -->
-
-                <div class="card shadow mb-4">
-
-                    <div class="card-header bg-primary text-white">
-
-                        <h5 class="mb-0">
-
-                            Registrar nueva materia
-
-                        </h5>
-
+                    <div class="materias-card-icon" aria-hidden="true">
+                        +
                     </div>
 
+                    <div>
+                        <h2>Registrar nueva materia</h2>
 
-                    <div class="card-body">
-
-                        <form method="POST">
-
-                            <div class="row">
-
-                                <div class="col-md-8">
-
-                                    <label class="form-label">
-
-                                        Nombre de la materia
-
-                                    </label>
-
-                                    <input
-                                        type="text"
-                                        name="nombre"
-                                        class="form-control"
-                                        placeholder="Ejemplo: Matemáticas"
-                                        required
-                                    >
-
-                                </div>
-
-
-                                <div class="col-md-4 d-flex align-items-end">
-
-                                    <button
-                                        type="submit"
-                                        class="btn btn-primary w-100"
-                                    >
-
-                                        Registrar materia
-
-                                    </button>
-
-                                </div>
-
-                            </div>
-
-                        </form>
-
+                        <p>
+                            Añade una asignatura al sistema académico.
+                        </p>
                     </div>
 
                 </div>
 
+                <div class="card-body">
 
-                <!-- LISTA -->
+                    <form method="POST" action="index.php">
 
-                <div class="card shadow">
+                        <div class="materias-form-group">
 
-                    <div class="card-header bg-success text-white">
+                            <label
+                                for="nombre"
+                                class="form-label"
+                            >
+                                Nombre de la materia
+                            </label>
 
-                        <h5 class="mb-0">
+                            <input
+                                type="text"
+                                name="nombre"
+                                id="nombre"
+                                class="form-control materias-input"
+                                placeholder="Ejemplo: Matemáticas"
+                                maxlength="100"
+                                autocomplete="off"
+                                required
+                            >
 
-                            Materias registradas
+                            <div class="form-text">
+                                Escribe el nombre completo de la asignatura.
+                            </div>
 
-                        </h5>
+                        </div>
 
+                        <div class="materias-form-actions">
+
+                            <button
+                                type="submit"
+                                class="btn materias-btn-guardar"
+                            >
+                                Registrar materia
+                            </button>
+
+                            <button
+                                type="reset"
+                                class="btn materias-btn-limpiar"
+                            >
+                                Limpiar
+                            </button>
+
+                        </div>
+
+                    </form>
+
+                </div>
+
+            </section>
+
+
+            <!-- TABLA DE MATERIAS -->
+
+            <section class="card materias-card">
+
+                <div class="materias-card-header">
+
+                    <div class="materias-card-icon materias-icon-lista"
+                         aria-hidden="true">
+                        ☷
                     </div>
 
+                    <div>
+                        <h2>Materias registradas</h2>
 
-                    <div class="card-body">
+                        <p>
+                            Consulta las asignaturas disponibles.
+                        </p>
+                    </div>
+
+                    <?php if ($resultadoMaterias): ?>
+
+                        <span class="materias-contador">
+                            <?= $resultadoMaterias->num_rows ?>
+                            <?= $resultadoMaterias->num_rows === 1
+                                ? "materia"
+                                : "materias" ?>
+                        </span>
+
+                    <?php endif; ?>
+
+                </div>
+
+                <div class="card-body p-0">
+
+                    <?php if (
+                        $resultadoMaterias &&
+                        $resultadoMaterias->num_rows > 0
+                    ): ?>
 
                         <div class="table-responsive">
 
-                            <table class="table table-bordered table-striped">
+                            <table class="table materias-table align-middle mb-0">
 
                                 <thead>
-
                                     <tr>
-
-                                        <th>
+                                        <th
+                                            scope="col"
+                                            class="materias-numero-col"
+                                        >
                                             #
                                         </th>
 
-                                        <th>
+                                        <th scope="col">
                                             Materia
                                         </th>
 
-                                        <th>
+                                        <th
+                                            scope="col"
+                                            class="materias-accion-col"
+                                        >
                                             Acción
                                         </th>
-
                                     </tr>
-
                                 </thead>
-
 
                                 <tbody>
 
-                                <?php
-
-                                $sql = "SELECT *
-                                        FROM materias
-                                        ORDER BY nombre ASC";
-
-                                $resultado = $conexion->query($sql);
-
-
-                                if ($resultado->num_rows > 0) {
-
+                                    <?php
                                     $contador = 1;
-
 
                                     while (
                                         $materia =
-                                        $resultado->fetch_assoc()
-                                    ) {
+                                        $resultadoMaterias->fetch_assoc()
+                                    ):
+                                    ?>
 
-                                ?>
+                                        <tr>
 
-                                    <tr>
+                                            <td class="materias-numero">
+                                                <?= $contador++ ?>
+                                            </td>
 
-                                        <td>
+                                            <td>
+                                                <span class="materias-nombre">
+                                                    <?= htmlspecialchars(
+                                                        $materia["nombre"],
+                                                        ENT_QUOTES,
+                                                        "UTF-8"
+                                                    ) ?>
+                                                </span>
+                                            </td>
 
-                                            <?= $contador++ ?>
+                                            <td>
+                                                <a
+                                                    href="index.php?eliminar=<?= (int) $materia["id"] ?>"
+                                                    class="btn materias-btn-eliminar"
+                                                    onclick="return confirm('¿Seguro que deseas eliminar esta materia? Si está relacionada con una carga académica, la base de datos podría impedirlo.');"
+                                                >
+                                                    Eliminar
+                                                </a>
+                                            </td>
 
-                                        </td>
+                                        </tr>
 
-
-                                        <td>
-
-                                            <?= htmlspecialchars(
-                                                $materia["nombre"]
-                                            ) ?>
-
-                                        </td>
-
-
-                                        <td>
-
-                                            <a
-                                                href="?eliminar=<?= $materia["id"] ?>"
-                                                class="btn btn-danger btn-sm"
-                                                onclick="return confirm('¿Seguro que deseas eliminar esta materia?');"
-                                            >
-
-                                                Eliminar
-
-                                            </a>
-
-                                        </td>
-
-                                    </tr>
-
-                                <?php
-
-                                    }
-
-                                } else {
-
-                                ?>
-
-                                    <tr>
-
-                                        <td
-                                            colspan="3"
-                                            class="text-center"
-                                        >
-
-                                            No hay materias registradas.
-
-                                        </td>
-
-                                    </tr>
-
-                                <?php
-
-                                }
-
-                                ?>
+                                    <?php endwhile; ?>
 
                                 </tbody>
 
@@ -351,21 +405,37 @@ include("../../includes/navbar.php");
 
                         </div>
 
-                    </div>
+                    <?php else: ?>
+
+                        <div class="materias-vacio">
+
+                            <div
+                                class="materias-vacio-icon"
+                                aria-hidden="true"
+                            >
+                                ▣
+                            </div>
+
+                            <h3>No hay materias registradas</h3>
+
+                            <p>
+                                Registra la primera materia desde el
+                                formulario superior.
+                            </p>
+
+                        </div>
+
+                    <?php endif; ?>
 
                 </div>
 
-            </div>
+            </section>
 
         </div>
 
-    </div>
+    </main>
 
 </div>
 
-
-<?php
-
-include("../../includes/footer.php");
-
-?>
+<?php include("../../includes/footer.php"); ?>
+```

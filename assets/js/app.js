@@ -1,3 +1,4 @@
+
 /* =========================================================
    EVALORANET - JAVASCRIPT PRINCIPAL
 ========================================================= */
@@ -6,114 +7,77 @@ document.addEventListener("DOMContentLoaded", function () {
 
     /* =====================================================
        GRÁFICA DE DESEMPEÑO DEL ESTUDIANTE
+       Bajo = rojo | Básico = amarillo | Alto = verde
     ====================================================== */
 
     const graficaDesempeno =
         document.getElementById("graficaDesempeno");
 
-    if (
-        graficaDesempeno &&
-        typeof Chart !== "undefined"
-    ) {
+    if (graficaDesempeno && typeof Chart !== "undefined") {
 
-        const bajo =
-            Number(graficaDesempeno.dataset.bajo || 0);
+        const bajo = Number(graficaDesempeno.dataset.bajo || 0);
+        const basico = Number(graficaDesempeno.dataset.basico || 0);
+        const alto = Number(graficaDesempeno.dataset.alto || 0);
 
-        const basico =
-            Number(graficaDesempeno.dataset.basico || 0);
+        // Evitar dibujar una gráfica vacía.
+        if (bajo + basico + alto > 0) {
 
-        const alto =
-            Number(graficaDesempeno.dataset.alto || 0);
+            new Chart(graficaDesempeno, {
+                type: "doughnut",
 
-        new Chart(graficaDesempeno, {
+                data: {
+                    labels: ["Bajo", "Básico", "Alto"],
 
-            type: "doughnut",
+                    datasets: [{
+                        data: [bajo, basico, alto],
 
-            data: {
+                        backgroundColor: [
+                            "#DC3545", // Bajo: rojo
+                            "#FFC107", // Básico: amarillo
+                            "#198754"  // Alto: verde
+                        ],
 
-                labels: [
-                    "Bajo",
-                    "Básico",
-                    "Alto"
-                ],
+                        borderColor: "#FFFFFF",
+                        borderWidth: 3,
+                        hoverOffset: 6
+                    }]
+                },
 
-                datasets: [{
-                    data: [
-                        bajo,
-                        basico,
-                        alto
-                    ],
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    cutout: "65%",
 
-                    backgroundColor: [
-                        "#dc3545",
-                        "#ffc107",
-                        "#198754"
-                    ],
+                    plugins: {
+                        legend: {
+                            position: "bottom",
 
-                    borderColor: [
-                        "#ffffff",
-                        "#ffffff",
-                        "#ffffff"
-                    ],
+                            labels: {
+                                padding: 16,
+                                usePointStyle: true,
 
-                    borderWidth: 3
-                }]
-            },
+                                font: {
+                                    size: 12
+                                }
+                            }
+                        },
 
-            options: {
-
-                responsive: true,
-
-                maintainAspectRatio: true,
-
-                cutout: "65%",
-
-                plugins: {
-
-                    legend: {
-
-                        position: "bottom",
-
-                        labels: {
-
-                            padding: 20,
-
-                            usePointStyle: true,
-
-                            font: {
-                                size: 14
+                        tooltip: {
+                            callbacks: {
+                                label: function (context) {
+                                    return " " + context.label + ": " + context.raw;
+                                }
                             }
                         }
                     },
 
-                    tooltip: {
-
-                        callbacks: {
-
-                            label: function (context) {
-
-                                const valor =
-                                    context.raw;
-
-                                return (
-                                    " " +
-                                    context.label +
-                                    ": " +
-                                    valor
-                                );
-                            }
-                        }
+                    animation: {
+                        animateRotate: true,
+                        animateScale: true
                     }
-                },
-
-                animation: {
-
-                    animateRotate: true,
-
-                    animateScale: true
                 }
-            }
-        });
+            });
+        }
     }
 
 
@@ -122,122 +86,66 @@ document.addEventListener("DOMContentLoaded", function () {
     ====================================================== */
 
     const botonFiltrar =
-        document.getElementById(
-            "aplicarFiltrosCarga"
-        );
+        document.getElementById("aplicarFiltrosCarga");
 
     const botonLimpiar =
-        document.getElementById(
-            "limpiarFiltrosCarga"
-        );
+        document.getElementById("limpiarFiltrosCarga");
 
     const buscador =
-        document.getElementById(
-            "buscarCarga"
-        );
+        document.getElementById("buscarCarga");
 
     const filtroDocente =
-        document.getElementById(
-            "filtroDocente"
-        );
+        document.getElementById("filtroDocente");
 
     const filtroCurso =
-        document.getElementById(
-            "filtroCurso"
-        );
+        document.getElementById("filtroCurso");
 
     const filtroMateria =
-        document.getElementById(
-            "filtroMateria"
-        );
+        document.getElementById("filtroMateria");
 
     const contador =
-        document.getElementById(
-            "contadorCarga"
-        );
+        document.getElementById("contadorCarga");
 
     const filas =
-        document.querySelectorAll(
-            ".fila-carga"
-        );
+        document.querySelectorAll(".fila-carga");
 
-
-    /* =====================================================
-       FUNCIÓN FILTRAR CARGA ACADÉMICA
-    ====================================================== */
 
     function filtrarCargaAcademica() {
 
-        const texto =
-            buscador
-                ? buscador.value
-                    .trim()
-                    .toLowerCase()
-                : "";
+        const texto = buscador
+            ? buscador.value.trim().toLowerCase()
+            : "";
 
         const docenteSeleccionado =
-            filtroDocente
-                ? filtroDocente.value
-                : "";
+            filtroDocente ? filtroDocente.value : "";
 
         const cursoSeleccionado =
-            filtroCurso
-                ? filtroCurso.value
-                : "";
+            filtroCurso ? filtroCurso.value : "";
 
         const materiaSeleccionada =
-            filtroMateria
-                ? filtroMateria.value
-                : "";
+            filtroMateria ? filtroMateria.value : "";
 
         let resultados = 0;
-
+        let numero = 1;
 
         filas.forEach(function (fila) {
 
-            const docenteId =
-                fila.dataset.docenteId || "";
+            const docenteId = fila.dataset.docenteId || "";
+            const cursoId = fila.dataset.cursoId || "";
+            const materiaId = fila.dataset.materiaId || "";
 
-            const cursoId =
-                fila.dataset.cursoId || "";
+            const obtenerTexto = function (selector) {
+                const elemento = fila.querySelector(selector);
 
-            const materiaId =
-                fila.dataset.materiaId || "";
+                return elemento
+                    ? elemento.textContent.trim().toLowerCase()
+                    : "";
+            };
 
-
-            const docente =
-                fila.querySelector(
-                    ".dato-docente"
-                )?.textContent
-                    .trim()
-                    .toLowerCase() || "";
-
-
-            const documento =
-                fila.querySelector(
-                    ".dato-documento"
-                )?.textContent
-                    .trim()
-                    .toLowerCase() || "";
-
-
-            const curso =
-                fila.querySelector(
-                    ".dato-curso"
-                )?.textContent
-                    .trim()
-                    .toLowerCase() || "";
-
-
-            const materia =
-                fila.querySelector(
-                    ".dato-materia"
-                )?.textContent
-                    .trim()
-                    .toLowerCase() || "";
-
-
-            /* BUSCADOR GENERAL */
+            const docente = obtenerTexto(".dato-docente");
+            const documento = obtenerTexto(".dato-documento");
+            const curso = obtenerTexto(".dato-curso");
+            const materia = obtenerTexto(".dato-materia");
 
             const coincideTexto =
                 texto === "" ||
@@ -246,29 +154,17 @@ document.addEventListener("DOMContentLoaded", function () {
                 curso.includes(texto) ||
                 materia.includes(texto);
 
-
-            /* FILTRO DOCENTE */
-
             const coincideDocente =
                 docenteSeleccionado === "" ||
                 docenteId === docenteSeleccionado;
-
-
-            /* FILTRO CURSO */
 
             const coincideCurso =
                 cursoSeleccionado === "" ||
                 cursoId === cursoSeleccionado;
 
-
-            /* FILTRO MATERIA */
-
             const coincideMateria =
                 materiaSeleccionada === "" ||
                 materiaId === materiaSeleccionada;
-
-
-            /* RESULTADO */
 
             const mostrar =
                 coincideTexto &&
@@ -276,378 +172,203 @@ document.addEventListener("DOMContentLoaded", function () {
                 coincideCurso &&
                 coincideMateria;
 
+            fila.style.display = mostrar ? "" : "none";
 
             if (mostrar) {
-
-                fila.style.display = "";
-
-                resultados++;
-
-            } else {
-
-                fila.style.display = "none";
-
-            }
-        });
-
-
-        /* =================================================
-           RENUMERAR FILAS
-        ================================================== */
-
-        let numero = 1;
-
-        filas.forEach(function (fila) {
-
-            if (fila.style.display !== "none") {
-
-                const numeroFila =
-                    fila.querySelector(
-                        ".numero-fila"
-                    );
+                const numeroFila = fila.querySelector(".numero-fila");
 
                 if (numeroFila) {
-
-                    numeroFila.textContent =
-                        numero++;
-
+                    numeroFila.textContent = numero++;
                 }
+
+                resultados++;
             }
         });
 
-
-        /* =================================================
-           CONTADOR
-        ================================================== */
-
         if (contador) {
-
             contador.textContent =
                 resultados +
-                (
-                    resultados === 1
-                        ? " resultado"
-                        : " resultados"
-                );
+                (resultados === 1 ? " resultado" : " resultados");
         }
     }
 
 
-    /* =====================================================
-       BOTÓN BUSCAR / FILTRAR
-    ====================================================== */
-
     if (botonFiltrar) {
-
         botonFiltrar.addEventListener(
             "click",
-            function () {
-
-                filtrarCargaAcademica();
-
-            }
+            filtrarCargaAcademica
         );
     }
-
-
-    /* =====================================================
-       BOTÓN LIMPIAR
-    ====================================================== */
 
     if (botonLimpiar) {
+        botonLimpiar.addEventListener("click", function () {
 
-        botonLimpiar.addEventListener(
-            "click",
-            function () {
+            if (buscador) buscador.value = "";
+            if (filtroDocente) filtroDocente.value = "";
+            if (filtroCurso) filtroCurso.value = "";
+            if (filtroMateria) filtroMateria.value = "";
 
-                if (buscador) {
-                    buscador.value = "";
-                }
-
-                if (filtroDocente) {
-                    filtroDocente.value = "";
-                }
-
-                if (filtroCurso) {
-                    filtroCurso.value = "";
-                }
-
-                if (filtroMateria) {
-                    filtroMateria.value = "";
-                }
-
-                filtrarCargaAcademica();
-
-            }
-        );
+            filtrarCargaAcademica();
+        });
     }
-
-
-    /* =====================================================
-       BUSCAR CON ENTER
-    ====================================================== */
 
     if (buscador) {
-
-        buscador.addEventListener(
-            "keydown",
-            function (evento) {
-
-                if (evento.key === "Enter") {
-
-                    evento.preventDefault();
-
-                    filtrarCargaAcademica();
-
-                }
-            }
-        );
-    }
-
-
-    /* =====================================================
-       FILTRAR AUTOMÁTICAMENTE AL CAMBIAR SELECT
-    ====================================================== */
-
-    if (filtroDocente) {
-
-        filtroDocente.addEventListener(
-            "change",
-            function () {
-
+        buscador.addEventListener("keydown", function (evento) {
+            if (evento.key === "Enter") {
+                evento.preventDefault();
                 filtrarCargaAcademica();
-
             }
-        );
+        });
     }
 
-
-    if (filtroCurso) {
-
-        filtroCurso.addEventListener(
-            "change",
-            function () {
-
-                filtrarCargaAcademica();
-
-            }
-        );
-    }
-
-
-    if (filtroMateria) {
-
-        filtroMateria.addEventListener(
-            "change",
-            function () {
-
-                filtrarCargaAcademica();
-
-            }
-        );
-    }
-
-
-    /* =====================================================
-       CONTADOR INICIAL
-    ====================================================== */
+    [filtroDocente, filtroCurso, filtroMateria].forEach(function (filtro) {
+        if (filtro) {
+            filtro.addEventListener("change", filtrarCargaAcademica);
+        }
+    });
 
     if (filas.length > 0) {
-
         filtrarCargaAcademica();
-
     }
 
 
     /* =====================================================
-       ANIMACIÓN SUAVE DE LAS TARJETAS
+       SEMÁFORO DE DESEMPEÑO
     ====================================================== */
 
-    const tarjetas =
-        document.querySelectorAll(".card");
+    const botonesDesempeno =
+        document.querySelectorAll(".btn-desempeno");
 
-    tarjetas.forEach(function (tarjeta) {
+    botonesDesempeno.forEach(function (boton) {
 
-        tarjeta.addEventListener(
-            "mouseenter",
-            function () {
+        boton.addEventListener("click", function () {
 
-                tarjeta.style.transform =
-                    "translateY(-3px)";
+            const fila = boton.closest("tr");
 
-                tarjeta.style.transition =
-                    "transform 0.2s ease";
+            if (!fila) return;
 
+            fila.querySelectorAll(".btn-desempeno").forEach(function (btn) {
+                btn.classList.remove("seleccionado");
+            });
+
+            boton.classList.add("seleccionado");
+
+            const formulario = boton.closest("form");
+
+            if (!formulario) return;
+
+            const estudianteId = boton.dataset.estudiante;
+            const colorId = boton.dataset.color;
+
+            let inputEstudiante =
+                formulario.querySelector('input[name="estudiante_id"]');
+
+            if (!inputEstudiante) {
+                inputEstudiante = document.createElement("input");
+                inputEstudiante.type = "hidden";
+                inputEstudiante.name = "estudiante_id";
+                formulario.appendChild(inputEstudiante);
             }
-        );
 
-        tarjeta.addEventListener(
-            "mouseleave",
-            function () {
+            let inputColor =
+                formulario.querySelector('input[name="color_id"]');
 
-                tarjeta.style.transform =
-                    "translateY(0)";
-
+            if (!inputColor) {
+                inputColor = document.createElement("input");
+                inputColor.type = "hidden";
+                inputColor.name = "color_id";
+                formulario.appendChild(inputColor);
             }
-        );
 
+            inputEstudiante.value = estudianteId || "";
+            inputColor.value = colorId || "";
+        });
     });
+
+
+    /* =====================================================
+       MENÚ LATERAL RESPONSIVE
+    ====================================================== */
+
+    const menu = document.getElementById("evaloraSidebar");
+    const toggle = document.getElementById("evaloraMenuToggle");
+    const cerrar = document.getElementById("evaloraMenuClose");
+    const overlay = document.getElementById("evaloraSidebarOverlay");
+
+    if (menu && toggle && cerrar && overlay) {
+
+        function abrirMenu() {
+            menu.classList.add("is-open");
+            overlay.classList.add("is-visible");
+            document.body.classList.add("evalora-menu-open");
+
+            toggle.setAttribute("aria-expanded", "true");
+            toggle.setAttribute(
+                "aria-label",
+                "Cerrar menú de navegación"
+            );
+        }
+
+        function cerrarMenu() {
+            menu.classList.remove("is-open");
+            overlay.classList.remove("is-visible");
+            document.body.classList.remove("evalora-menu-open");
+
+            toggle.setAttribute("aria-expanded", "false");
+            toggle.setAttribute(
+                "aria-label",
+                "Abrir menú de navegación"
+            );
+        }
+
+        toggle.addEventListener("click", function () {
+            if (menu.classList.contains("is-open")) {
+                cerrarMenu();
+            } else {
+                abrirMenu();
+            }
+        });
+
+        cerrar.addEventListener("click", cerrarMenu);
+        overlay.addEventListener("click", cerrarMenu);
+
+        document.addEventListener("keydown", function (evento) {
+            if (evento.key === "Escape") {
+                cerrarMenu();
+            }
+        });
+
+        menu.querySelectorAll("a").forEach(function (enlace) {
+            enlace.addEventListener("click", cerrarMenu);
+        });
+
+        window.addEventListener("resize", function () {
+            if (window.innerWidth > 768) {
+                cerrarMenu();
+            }
+        });
+    }
 
 
     /* =====================================================
        CONFIRMACIÓN PARA CERRAR SESIÓN
     ====================================================== */
 
-    const enlacesLogout =
-        document.querySelectorAll(
-            'a[href*="logout.php"]'
-        );
+    document.querySelectorAll('a[href*="logout.php"]').forEach(
+        function (enlace) {
 
-    enlacesLogout.forEach(function (enlace) {
+            enlace.addEventListener("click", function (evento) {
 
-        enlace.addEventListener(
-            "click",
-            function (evento) {
-
-                const confirmar =
-                    confirm(
-                        "¿Estás seguro de que deseas cerrar sesión?"
-                    );
+                const confirmar = window.confirm(
+                    "¿Estás seguro de que deseas cerrar sesión?"
+                );
 
                 if (!confirmar) {
-
                     evento.preventDefault();
-
                 }
-            }
-        );
-
-    });
-
-});
-/* ======================================================
-   SEMÁFORO DE DESEMPEÑO
-====================================================== */
-
-document.addEventListener("DOMContentLoaded", function () {
-
-    const botones =
-        document.querySelectorAll(".btn-desempeno");
-
-
-    botones.forEach(function (boton) {
-
-        boton.addEventListener("click", function () {
-
-            const fila =
-                boton.closest("tr");
-
-
-            if (!fila) {
-                return;
-            }
-
-
-            // Quitar selección de la fila
-
-            fila
-                .querySelectorAll(".btn-desempeno")
-                .forEach(function (btn) {
-
-                    btn.classList.remove(
-                        "seleccionado"
-                    );
-
-                });
-
-
-            // Seleccionar el botón actual
-
-            boton.classList.add(
-                "seleccionado"
-            );
-
-
-            // Obtener estudiante y color
-
-            const estudianteId =
-                boton.dataset.estudiante;
-
-            const colorId =
-                boton.dataset.color;
-
-
-            // Buscar el formulario
-
-            const formulario =
-                boton.closest("form");
-
-
-            if (!formulario) {
-                return;
-            }
-
-
-            /*
-             * Crear/actualizar el estudiante
-             * y color que se enviarán.
-             */
-
-            let inputEstudiante =
-                formulario.querySelector(
-                    'input[name="estudiante_id"]'
-                );
-
-
-            if (!inputEstudiante) {
-
-                inputEstudiante =
-                    document.createElement("input");
-
-                inputEstudiante.type = "hidden";
-
-                inputEstudiante.name =
-                    "estudiante_id";
-
-                formulario.appendChild(
-                    inputEstudiante
-                );
-
-            }
-
-
-            let inputColor =
-                formulario.querySelector(
-                    'input[name="color_id"]'
-                );
-
-
-            if (!inputColor) {
-
-                inputColor =
-                    document.createElement("input");
-
-                inputColor.type = "hidden";
-
-                inputColor.name =
-                    "color_id";
-
-                formulario.appendChild(
-                    inputColor
-                );
-
-            }
-
-
-            inputEstudiante.value =
-                estudianteId;
-
-
-            inputColor.value =
-                colorId;
-
-        });
-
-    });
+            });
+        }
+    );
 
 });
+

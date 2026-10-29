@@ -1,57 +1,35 @@
+
 <?php
 
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 require_once("../../config/config.php");
 require_once("../../config/seguridad/coordinador.php");
-
 
 // =====================================================
 // ESTADÍSTICAS GENERALES
 // =====================================================
 
-$sql = $conexion->query("
-    SELECT COUNT(*) AS total
-    FROM estudiantes
-");
+$sql = $conexion->query("SELECT COUNT(*) AS total FROM estudiantes");
+$estudiantes = $sql ? (int) $sql->fetch_assoc()["total"] : 0;
 
-$estudiantes = $sql ? $sql->fetch_assoc()["total"] : 0;
+$sql = $conexion->query("SELECT COUNT(*) AS total FROM docentes");
+$docentes = $sql ? (int) $sql->fetch_assoc()["total"] : 0;
 
+$sql = $conexion->query("SELECT COUNT(*) AS total FROM cursos");
+$cursos = $sql ? (int) $sql->fetch_assoc()["total"] : 0;
 
-$sql = $conexion->query("
-    SELECT COUNT(*) AS total
-    FROM docentes
-");
+$sql = $conexion->query("SELECT COUNT(*) AS total FROM materias");
+$materias = $sql ? (int) $sql->fetch_assoc()["total"] : 0;
 
-$docentes = $sql ? $sql->fetch_assoc()["total"] : 0;
-
-
-$sql = $conexion->query("
-    SELECT COUNT(*) AS total
-    FROM cursos
-");
-
-$cursos = $sql ? $sql->fetch_assoc()["total"] : 0;
-
-
-$sql = $conexion->query("
-    SELECT COUNT(*) AS total
-    FROM materias
-");
-
-$materias = $sql ? $sql->fetch_assoc()["total"] : 0;
-
-
-$sql = $conexion->query("
-    SELECT COUNT(*) AS total
-    FROM carga_academica
-");
-
-$cargas = $sql ? $sql->fetch_assoc()["total"] : 0;
+$sql = $conexion->query("SELECT COUNT(*) AS total FROM carga_academica");
+$cargas = $sql ? (int) $sql->fetch_assoc()["total"] : 0;
 
 
 // =====================================================
-// RESUMEN DE SEMÁFORO
+// RESUMEN DE DESEMPEÑO
 // =====================================================
 
 $sql = $conexion->query("
@@ -63,24 +41,16 @@ $sql = $conexion->query("
     FROM colores_desempeno cd
     LEFT JOIN desempeno_estudiantes de
         ON de.color_id = cd.id
-    GROUP BY
-        cd.id,
-        cd.desempeno,
-        cd.color
+    GROUP BY cd.id, cd.desempeno, cd.color
     ORDER BY cd.id
 ");
-
 
 $resumen_colores = [];
 
 if ($sql) {
-
     while ($fila = $sql->fetch_assoc()) {
-
         $resumen_colores[] = $fila;
-
     }
-
 }
 
 
@@ -90,38 +60,25 @@ if ($sql) {
 
 $sqlCargaDocente = "
     SELECT
-
         d.id AS docente_id,
-
         u.nombres,
-
         u.apellidos,
-
         u.documento,
-
         COUNT(ca.id) AS total
-
     FROM docentes d
-
     INNER JOIN usuarios u
         ON d.usuario_id = u.id
-
     LEFT JOIN carga_academica ca
         ON ca.docente_id = d.id
-
     GROUP BY
         d.id,
         u.nombres,
         u.apellidos,
         u.documento
-
-    ORDER BY
-        u.apellidos ASC,
-        u.nombres ASC
+    ORDER BY u.apellidos ASC, u.nombres ASC
 ";
 
-$resultadoCargaDocente =
-    $conexion->query($sqlCargaDocente);
+$resultadoCargaDocente = $conexion->query($sqlCargaDocente);
 
 
 // =====================================================
@@ -130,431 +87,269 @@ $resultadoCargaDocente =
 
 $sqlEstudiantesCurso = "
     SELECT
-
         c.id AS curso_id,
-
         c.nombre AS curso,
-
         COUNT(e.id) AS total
-
     FROM cursos c
-
     LEFT JOIN estudiantes e
         ON e.curso_id = c.id
-
-    GROUP BY
-        c.id,
-        c.nombre
-
-    ORDER BY
-        c.nombre ASC
+    GROUP BY c.id, c.nombre
+    ORDER BY c.nombre ASC
 ";
 
-$resultadoEstudiantesCurso =
-    $conexion->query($sqlEstudiantesCurso);
+$resultadoEstudiantesCurso = $conexion->query($sqlEstudiantesCurso);
+
+
+// =====================================================
+// ESTRUCTURA VISUAL COMPARTIDA
+// =====================================================
+
+include("../../includes/header.php");
+include("../../includes/navbar.php");
 
 ?>
 
-<!DOCTYPE html>
+<div class="evalora-layout">
 
-<html lang="es">
+    <?php include("../../includes/sidebar.php"); ?>
 
-<head>
+    <main class="evalora-main reportes-page">
 
-    <meta charset="UTF-8">
+        <div class="reportes-contenido">
 
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
-
-    <title>Reportes académicos</title>
-
-    <link
-        href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
-        rel="stylesheet"
-    >
-
-</head>
-
-
-<body>
-
-
-<?php include("../../includes/navbar.php"); ?>
-
-
-<div class="container-fluid">
-
-    <div class="row">
-
-
-        <!-- SIDEBAR -->
-
-        <div class="col-md-2 p-0">
-
-            <?php include("../../includes/sidebar.php"); ?>
-
-        </div>
-
-
-        <!-- CONTENIDO -->
-
-        <div class="col-md-10">
-
-            <div class="container mt-4">
-
-
-                <h2>
-                    Reportes académicos
-                </h2>
-
-                <p class="text-muted">
-
-                    Resumen general y seguimiento del desempeño
-                    de los estudiantes.
-
-                </p>
-
-                <hr>
-
-
-                <!-- =================================================
-                     ESTADÍSTICAS GENERALES
-                ================================================== -->
-
-                <div class="row g-3 mb-4">
-
-
-                    <div class="col-md-4 col-lg-2">
-
-                        <div class="card shadow bg-primary text-white">
-
-                            <div class="card-body text-center">
-
-                                <h6>
-                                    Estudiantes
-                                </h6>
-
-                                <h2>
-                                    <?= $estudiantes ?>
-                                </h2>
-
-                            </div>
-
-                        </div>
-
-                    </div>
-
-
-                    <div class="col-md-4 col-lg-2">
-
-                        <div class="card shadow bg-success text-white">
-
-                            <div class="card-body text-center">
-
-                                <h6>
-                                    Docentes
-                                </h6>
-
-                                <h2>
-                                    <?= $docentes ?>
-                                </h2>
-
-                            </div>
-
-                        </div>
-
-                    </div>
-
-
-                    <div class="col-md-4 col-lg-2">
-
-                        <div class="card shadow bg-warning">
-
-                            <div class="card-body text-center">
-
-                                <h6>
-                                    Cursos
-                                </h6>
-
-                                <h2>
-                                    <?= $cursos ?>
-                                </h2>
-
-                            </div>
-
-                        </div>
-
-                    </div>
-
-
-                    <div class="col-md-4 col-lg-2">
-
-                        <div class="card shadow bg-info text-white">
-
-                            <div class="card-body text-center">
-
-                                <h6>
-                                    Materias
-                                </h6>
-
-                                <h2>
-                                    <?= $materias ?>
-                                </h2>
-
-                            </div>
-
-                        </div>
-
-                    </div>
-
-
-                    <div class="col-md-4 col-lg-2">
-
-                        <div class="card shadow bg-secondary text-white">
-
-                            <div class="card-body text-center">
-
-                                <h6>
-                                    Cargas
-                                </h6>
-
-                                <h2>
-                                    <?= $cargas ?>
-                                </h2>
-
-                            </div>
-
-                        </div>
-
-                    </div>
-
+            <!-- ENCABEZADO -->
+            <header class="reportes-heading">
+                <div class="reportes-heading-icon" aria-hidden="true">
+                    <span>▤</span>
                 </div>
 
+                <div>
+                    <h1>Reportes académicos</h1>
+                    <p class="reportes-descripcion">
+                        Resumen general y seguimiento del desempeño
+                        de los estudiantes.
+                    </p>
+                </div>
+            </header>
 
-                <!-- =================================================
-                     SEMÁFORO GENERAL
-                ================================================== -->
 
-                <div class="card shadow mb-4">
+            <!-- ESTADÍSTICAS GENERALES -->
+            <section class="reportes-estadisticas">
 
-                    <div class="card-header bg-dark text-white">
+                <article class="reportes-estadistica">
+                    <div class="reportes-stat-icon stat-azul" aria-hidden="true">
+                        ♙
+                    </div>
+                    <div class="estadistica-titulo">Estudiantes</div>
+                    <p class="estadistica-valor">
+                        <?= $estudiantes ?>
+                    </p>
+                    <div class="reportes-stat-pie">Registrados en el sistema</div>
+                </article>
 
-                        <h5 class="mb-0">
-                            Balance general de desempeño
-                        </h5>
+                <article class="reportes-estadistica">
+                    <div class="reportes-stat-icon stat-verde" aria-hidden="true">
+                        ♧
+                    </div>
+                    <div class="estadistica-titulo">Docentes</div>
+                    <p class="estadistica-valor">
+                        <?= $docentes ?>
+                    </p>
+                    <div class="reportes-stat-pie">Personal docente</div>
+                </article>
 
+                <article class="reportes-estadistica">
+                    <div class="reportes-stat-icon stat-amarillo" aria-hidden="true">
+                        ▦
+                    </div>
+                    <div class="estadistica-titulo">Cursos</div>
+                    <p class="estadistica-valor">
+                        <?= $cursos ?>
+                    </p>
+                    <div class="reportes-stat-pie">Cursos registrados</div>
+                </article>
+
+                <article class="reportes-estadistica">
+                    <div class="reportes-stat-icon stat-cian" aria-hidden="true">
+                        ▣
+                    </div>
+                    <div class="estadistica-titulo">Materias</div>
+                    <p class="estadistica-valor">
+                        <?= $materias ?>
+                    </p>
+                    <div class="reportes-stat-pie">Materias registradas</div>
+                </article>
+
+                <article class="reportes-estadistica">
+                    <div class="reportes-stat-icon stat-gris" aria-hidden="true">
+                        ▤
+                    </div>
+                    <div class="estadistica-titulo">Cargas académicas</div>
+                    <p class="estadistica-valor">
+                        <?= $cargas ?>
+                    </p>
+                    <div class="reportes-stat-pie">Asignaciones registradas</div>
+                </article>
+
+            </section>
+
+
+            <!-- BALANCE DE DESEMPEÑO -->
+            <section class="card reportes-panel">
+
+                <div class="reportes-panel-header">
+                    <div class="reportes-panel-title-icon" aria-hidden="true">
+                        ◉
                     </div>
 
+                    <div>
+                        <h2>Balance general de desempeño</h2>
+                        <p>Distribución de estudiantes por nivel de desempeño.</p>
+                    </div>
+                </div>
 
-                    <div class="card-body">
+                <div class="card-body">
+                    <div class="row g-3">
 
-                        <div class="row g-3">
+                        <?php foreach ($resumen_colores as $color): ?>
 
+                            <div class="col-12 col-md-4">
 
-                            <?php foreach (
-                                $resumen_colores
-                                as $color
-                            ): ?>
+                                <article
+                                    class="reportes-desempeno"
+                                    style="--desempeno-color: <?= htmlspecialchars(
+                                        $color["color"],
+                                        ENT_QUOTES,
+                                        "UTF-8"
+                                    ) ?>;"
+                                >
 
-                                <div class="col-md-4">
+                                    <div class="reportes-desempeno-indicador"></div>
 
-                                    <div
-                                        class="card text-center shadow-sm"
-                                        style="
-                                            border-left:
-                                            8px solid
+                                    <div class="reportes-desempeno-contenido">
+
+                                        <h3>
                                             <?= htmlspecialchars(
-                                                $color["color"]
-                                            ) ?>;
-                                        "
-                                    >
+                                                ucfirst($color["desempeno"]),
+                                                ENT_QUOTES,
+                                                "UTF-8"
+                                            ) ?>
+                                        </h3>
 
-                                        <div class="card-body">
-
-                                            <h5>
-
-                                                <?= htmlspecialchars(
-                                                    ucfirst(
-                                                        $color["desempeno"]
-                                                    )
-                                                ) ?>
-
-                                            </h5>
-
-                                            <h2>
-
-                                                <?= (int)
-                                                    $color["total"] ?>
-
-                                            </h2>
-
-                                            <p class="text-muted mb-0">
-
-                                                estudiantes
-
-                                            </p>
-
+                                        <div class="reportes-desempeno-total">
+                                            <?= (int) $color["total"] ?>
                                         </div>
+
+                                        <p>estudiantes</p>
 
                                     </div>
 
-                                </div>
+                                </article>
 
-                            <?php endforeach; ?>
+                            </div>
 
-
-                        </div>
+                        <?php endforeach; ?>
 
                     </div>
-
                 </div>
 
+            </section>
 
-                <!-- =================================================
-                     DOCENTES
-                ================================================== -->
 
-                <div class="card shadow mb-4">
+            <!-- DOCENTES Y SEGUIMIENTO -->
+            <section class="card reportes-panel">
 
-                    <div class="card-header bg-success text-white">
-
-                        <h5 class="mb-0">
-
-                            Docentes y seguimiento
-
-                        </h5>
-
+                <div class="reportes-panel-header">
+                    <div class="reportes-panel-title-icon" aria-hidden="true">
+                        ♧
                     </div>
 
+                    <div>
+                        <h2>Docentes y seguimiento</h2>
+                        <p>Consulta las asignaciones y el seguimiento de cada docente.</p>
+                    </div>
+                </div>
 
-                    <div class="card-body">
+                <div class="card-body p-0">
 
-                        <?php if (
-                            $resultadoCargaDocente &&
-                            $resultadoCargaDocente->num_rows > 0
-                        ): ?>
+                    <?php if (
+                        $resultadoCargaDocente &&
+                        $resultadoCargaDocente->num_rows > 0
+                    ): ?>
 
+                        <div class="table-responsive">
 
-                            <div class="table-responsive">
+                            <table class="table reportes-table align-middle">
 
-                                <table
-                                    class="table table-bordered
-                                    table-hover align-middle"
-                                >
+                                <thead>
+                                    <tr>
+                                        <th scope="col">#</th>
+                                        <th scope="col">Docente</th>
+                                        <th scope="col">Documento</th>
+                                        <th scope="col">Asignaciones</th>
+                                        <th scope="col" class="text-center">
+                                            Acción
+                                        </th>
+                                    </tr>
+                                </thead>
 
-                                    <thead class="table-light">
-
-                                        <tr>
-
-                                            <th>
-                                                #
-                                            </th>
-
-                                            <th>
-                                                Docente
-                                            </th>
-
-                                            <th>
-                                                Documento
-                                            </th>
-
-                                            <th>
-                                                Asignaciones
-                                            </th>
-
-                                            <th class="text-center">
-                                                Acción
-                                            </th>
-
-                                        </tr>
-
-                                    </thead>
-
-
-                                    <tbody>
-
+                                <tbody>
 
                                     <?php
-
                                     $contador = 1;
 
                                     while (
-                                        $fila =
-                                        $resultadoCargaDocente->fetch_assoc()
+                                        $fila = $resultadoCargaDocente->fetch_assoc()
                                     ):
-
                                     ?>
 
                                         <tr>
 
-                                            <td>
+                                            <td class="reportes-numero">
                                                 <?= $contador++ ?>
                                             </td>
 
-
                                             <td>
-
-                                                <strong>
-
+                                                <strong class="reportes-nombre">
                                                     <?= htmlspecialchars(
-                                                        $fila["apellidos"]
-                                                        . ", "
-                                                        . $fila["nombres"]
+                                                        $fila["apellidos"] . ", " .
+                                                        $fila["nombres"],
+                                                        ENT_QUOTES,
+                                                        "UTF-8"
                                                     ) ?>
-
                                                 </strong>
-
                                             </td>
 
-
                                             <td>
-
                                                 <?= htmlspecialchars(
-                                                    $fila["documento"]
+                                                    $fila["documento"],
+                                                    ENT_QUOTES,
+                                                    "UTF-8"
                                                 ) ?>
-
                                             </td>
-
 
                                             <td>
-
-                                                <span
-                                                    class="badge bg-success"
-                                                >
-
-                                                    <?= (int)
-                                                        $fila["total"] ?>
-
+                                                <span class="reportes-badge">
+                                                    <?= (int) $fila["total"] ?>
                                                 </span>
-
                                             </td>
-
 
                                             <td class="text-center">
 
-                                                <?php if (
-                                                    $fila["total"] > 0
-                                                ): ?>
+                                                <?php if ((int) $fila["total"] > 0): ?>
 
                                                     <a
                                                         href="docente.php?id=<?= (int) $fila["docente_id"] ?>"
-                                                        class="btn btn-primary btn-sm"
+                                                        class="btn reportes-btn-seguimiento"
                                                     >
-
                                                         Ver seguimiento
-
+                                                        <span aria-hidden="true">→</span>
                                                     </a>
 
                                                 <?php else: ?>
 
-                                                    <span
-                                                        class="text-muted"
-                                                    >
-
+                                                    <span class="reportes-sin-asignaciones">
                                                         Sin asignaciones
-
                                                     </span>
 
                                                 <?php endif; ?>
@@ -565,162 +360,117 @@ $resultadoEstudiantesCurso =
 
                                     <?php endwhile; ?>
 
+                                </tbody>
 
-                                    </tbody>
+                            </table>
 
-                                </table>
+                        </div>
 
-                            </div>
+                    <?php else: ?>
 
+                        <div class="reportes-vacio">
+                            No hay docentes registrados.
+                        </div>
 
-                        <?php else: ?>
-
-                            <div class="alert alert-info">
-
-                                No hay docentes registrados.
-
-                            </div>
-
-                        <?php endif; ?>
-
-                    </div>
+                    <?php endif; ?>
 
                 </div>
 
+            </section>
 
-                <!-- =================================================
-                     ESTUDIANTES POR CURSO
-                ================================================== -->
 
-                <div class="card shadow mb-4">
+            <!-- ESTUDIANTES POR CURSO -->
+            <section class="card reportes-panel">
 
-                    <div class="card-header bg-primary text-white">
-
-                        <h5 class="mb-0">
-
-                            Estudiantes por curso
-
-                        </h5>
-
+                <div class="reportes-panel-header">
+                    <div class="reportes-panel-title-icon" aria-hidden="true">
+                        ▦
                     </div>
 
+                    <div>
+                        <h2>Estudiantes por curso</h2>
+                        <p>Consulta la cantidad de estudiantes registrados en cada curso.</p>
+                    </div>
+                </div>
 
-                    <div class="card-body">
+                <div class="card-body p-0">
 
-                        <?php if (
-                            $resultadoEstudiantesCurso &&
-                            $resultadoEstudiantesCurso->num_rows > 0
-                        ): ?>
+                    <?php if (
+                        $resultadoEstudiantesCurso &&
+                        $resultadoEstudiantesCurso->num_rows > 0
+                    ): ?>
 
+                        <div class="table-responsive">
 
-                            <div class="table-responsive">
+                            <table class="table reportes-table align-middle">
 
-                                <table
-                                    class="table table-bordered
-                                    table-hover align-middle"
-                                >
+                                <thead>
+                                    <tr>
+                                        <th scope="col">#</th>
+                                        <th scope="col">Curso</th>
+                                        <th scope="col">Estudiantes</th>
+                                    </tr>
+                                </thead>
 
-                                    <thead class="table-light">
-
-                                        <tr>
-
-                                            <th>
-                                                #
-                                            </th>
-
-                                            <th>
-                                                Curso
-                                            </th>
-
-                                            <th>
-                                                Estudiantes
-                                            </th>
-
-                                        </tr>
-
-                                    </thead>
-
-
-                                    <tbody>
-
+                                <tbody>
 
                                     <?php
-
                                     $contador = 1;
 
                                     while (
-                                        $fila =
-                                        $resultadoEstudiantesCurso->fetch_assoc()
+                                        $fila = $resultadoEstudiantesCurso->fetch_assoc()
                                     ):
-
                                     ?>
 
                                         <tr>
 
-                                            <td>
+                                            <td class="reportes-numero">
                                                 <?= $contador++ ?>
                                             </td>
 
                                             <td>
-
-                                                <?= htmlspecialchars(
-                                                    $fila["curso"]
-                                                ) ?>
-
+                                                <strong class="reportes-nombre">
+                                                    <?= htmlspecialchars(
+                                                        $fila["curso"],
+                                                        ENT_QUOTES,
+                                                        "UTF-8"
+                                                    ) ?>
+                                                </strong>
                                             </td>
 
                                             <td>
-
-                                                <span
-                                                    class="badge bg-primary"
-                                                >
-
-                                                    <?= (int)
-                                                        $fila["total"] ?>
-
+                                                <span class="reportes-badge reportes-badge-azul">
+                                                    <?= (int) $fila["total"] ?>
                                                 </span>
-
                                             </td>
 
                                         </tr>
 
                                     <?php endwhile; ?>
 
+                                </tbody>
 
-                                    </tbody>
+                            </table>
 
-                                </table>
+                        </div>
 
-                            </div>
+                    <?php else: ?>
 
+                        <div class="reportes-vacio">
+                            No hay cursos registrados.
+                        </div>
 
-                        <?php else: ?>
-
-                            <div class="alert alert-info">
-
-                                No hay estudiantes registrados.
-
-                            </div>
-
-                        <?php endif; ?>
-
-                    </div>
+                    <?php endif; ?>
 
                 </div>
 
-
-            </div>
+            </section>
 
         </div>
 
-    </div>
+    </main>
 
 </div>
 
-
 <?php include("../../includes/footer.php"); ?>
-
-
-</body>
-
-</html>
+```

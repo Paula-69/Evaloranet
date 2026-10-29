@@ -1,3 +1,4 @@
+
 <?php
 
 if (session_status() === PHP_SESSION_NONE) {
@@ -7,69 +8,37 @@ if (session_status() === PHP_SESSION_NONE) {
 $rol = $_SESSION["rol"] ?? '';
 $nombre = $_SESSION["nombre"] ?? '';
 
-/*
-|--------------------------------------------------------------------------
-| PANEL SEGÚN ROL
-|--------------------------------------------------------------------------
-*/
-
 $inicio = "/Evaloranet/";
 
 if ($rol === "coordinador") {
-
     $inicio .= "coordinador/index.php";
-
 } elseif ($rol === "docente") {
-
     $inicio .= "docente/index.php";
-
 } elseif ($rol === "estudiante") {
-
     $inicio .= "estudiante/index.php";
-
 } else {
-
     $inicio .= "auth/login.php";
-
 }
 
 ?>
 
-<nav class="navbar navbar-dark bg-primary">
-
+<nav class="navbar navbar-dark bg-primary evalora-navbar">
     <div class="container-fluid">
 
         <a
             class="navbar-brand"
-            href="<?= htmlspecialchars($inicio) ?>"
+            href="<?= htmlspecialchars($inicio, ENT_QUOTES, 'UTF-8') ?>"
         >
             Seguimiento Académico
         </a>
 
-
-        <div class="d-flex align-items-center">
-
-            <?php if ($nombre !== ''): ?>
-
-                <span class="text-white me-3">
-
-                    Bienvenido,
-                    <?= htmlspecialchars($nombre) ?>
-
+        <?php if ($nombre !== ''): ?>
+            <div class="d-flex align-items-center">
+                <span class="text-white">
+                    Hola, <?= htmlspecialchars($nombre, ENT_QUOTES, 'UTF-8') ?>
                 </span>
-
-            <?php endif; ?>
-
-
-            <a
-                href="/Evaloranet/auth/logout.php"
-                class="btn btn-danger btn-sm"
-            >
-                Cerrar sesión
-            </a>
-
-        </div>
+            </div>
+        <?php endif; ?>
 
     </div>
-
 </nav>
